@@ -51,7 +51,16 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // Mutation to add a new text element
   const addElementMutation = useMutation({
-    mutationFn: async (newElement: Omit<DesignElement, 'id'>) => {
+    mutationFn: async (newElement: {
+      type: string;
+      name: string;
+      position: { x: number; y: number };
+      size: { width: number; height: number };
+      rotation: number;
+      layer: number;
+      properties: Record<string, any>;
+      content?: string;
+    }) => {
       if (!templateId) {
         throw new Error('No template selected');
       }
@@ -61,12 +70,12 @@ const Canvas: React.FC<CanvasProps> = ({
         .insert({
           template_id: templateId,
           type: newElement.type,
-          properties: newElement.properties,
+          name: newElement.name,
           position: newElement.position,
           size: newElement.size,
           rotation: newElement.rotation,
           layer: newElement.layer,
-          name: newElement.name
+          properties: newElement.properties
         })
         .select()
         .single();
@@ -94,15 +103,15 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // Add a default text element
   const handleAddTextElement = () => {
-    const newTextElement: Omit<TextElement, 'id'> = {
+    const newTextElement = {
       type: 'text',
       name: 'New Text',
-      content: 'Sample Text',
       position: { x: 50, y: 50 },
       size: { width: 150, height: 50 },
       rotation: 0,
       layer: 0,
       properties: {
+        content: 'Sample Text',
         fontFamily: 'Arial',
         fontSize: 16,
         fontWeight: 'normal',
