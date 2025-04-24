@@ -8,16 +8,36 @@ import {
   Settings as SettingsIcon,
   FileText, 
   Plus, 
-  Search 
+  Search,
+  Text 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import ElementProperties from '../designer/ElementProperties';
 import ElementsList from '../designer/ElementsList';
-import TemplatesList from '../templates/TemplatesList';
 
-const Sidebar = () => {
+interface Template {
+  id: string;
+  name: string;
+  description?: string;
+  width: number;
+  height: number;
+}
+
+interface SidebarProps {
+  templates?: Template[];
+  onCreateTemplate?: () => void;
+  onSelectTemplate?: (id: string) => void;
+  selectedTemplateId?: string;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ 
+  templates = [], 
+  onCreateTemplate, 
+  onSelectTemplate,
+  selectedTemplateId 
+}) => {
   return (
     <div className="w-full h-full flex flex-col bg-sidebar border-r">
       <Tabs defaultValue="elements" className="flex-1 flex flex-col">
@@ -51,7 +71,7 @@ const Sidebar = () => {
           <TabsContent value="templates" className="p-4 mt-0">
             <div className="flex items-center mb-3">
               <h3 className="font-medium">Templates</h3>
-              <Button size="sm" variant="ghost" className="ml-auto">
+              <Button size="sm" variant="ghost" className="ml-auto" onClick={onCreateTemplate}>
                 <Plus className="h-4 w-4 mr-1" />
                 New
               </Button>
@@ -60,14 +80,41 @@ const Sidebar = () => {
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Search templates..." className="pl-8" />
             </div>
-            <TemplatesList />
+            <div className="space-y-2">
+              {templates.map((template) => (
+                <div 
+                  key={template.id}
+                  className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 ${selectedTemplateId === template.id ? 'border-primary bg-primary/5' : 'border-gray-200'}`}
+                  onClick={() => onSelectTemplate?.(template.id)}
+                >
+                  <div className="font-medium">{template.name}</div>
+                  {template.description && (
+                    <div className="text-sm text-gray-500 truncate">{template.description}</div>
+                  )}
+                  <div className="text-xs text-gray-400 mt-1">{template.width}x{template.height}px</div>
+                </div>
+              ))}
+              {templates.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No templates found</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2"
+                    onClick={onCreateTemplate}
+                  >
+                    Create Template
+                  </Button>
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="objects" className="p-4 mt-0">
             <h3 className="font-medium mb-3">Add Elements</h3>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" className="h-20 flex-col justify-center">
-                <FileText className="h-6 w-6 mb-1" />
+                <Text className="h-6 w-6 mb-1" />
                 <span>Text</span>
               </Button>
               <Button variant="outline" className="h-20 flex-col justify-center">
@@ -121,7 +168,7 @@ const Sidebar = () => {
               <div>
                 <label className="text-sm font-medium">Grid Settings</label>
                 <div className="flex items-center mt-1">
-                  <input type="checkbox" id="show-grid" className="mr-2" />
+                  <input type="checkbox" id="show-grid" className="mr-2" defaultChecked />
                   <label htmlFor="show-grid" className="text-sm">Show grid</label>
                 </div>
               </div>
