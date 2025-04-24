@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import DesignerPage from "./pages/DesignerPage";
 import TemplatesPage from "./pages/TemplatesPage";
 import DataPage from "./pages/DataPage";
+import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/designer" element={<DesignerPage />} />
           <Route path="/templates" element={<TemplatesPage />} />
           <Route path="/data" element={<DataPage />} />
+          <Route path="/auth" element={<AuthPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

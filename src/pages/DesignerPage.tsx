@@ -22,6 +22,28 @@ const DesignerPage = () => {
     height: 400
   });
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
+  const [user, setUser] = useState<any>(null);
+
+  // Check if user is authenticated
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+
+    getUser();
+
+    // Listen for auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setUser(session?.user || null);
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   // Fetch templates
   const { data: templates, isLoading } = useQuery({
@@ -48,13 +70,19 @@ const DesignerPage = () => {
   // Create a new template
   const createTemplateMutation = useMutation({
     mutationFn: async (template: typeof newTemplate) => {
+      // Check if user is authenticated
+      if (!user) {
+        throw new Error('You must be logged in to create a template');
+      }
+
       const { data, error } = await supabase
         .from('templates')
         .insert({
           name: template.name,
           description: template.description,
           width: template.width,
-          height: template.height
+          height: template.height,
+          user_id: user.id // Set the user_id field to the current user's ID
         })
         .select()
         .single();
@@ -246,7 +274,7 @@ const DesignerPage = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-            <Button onClick={handleCreateTemplate} disabled={createTemplateMutation.isPending}>
+            <Button onClick={handleCreateTemplate} disabled={createTemplateMutation.isPending || !user}>
               {createTemplateMutation.isPending ? 'Creating...' : 'Create Template'}
             </Button>
           </DialogFooter>
@@ -257,6 +285,20 @@ const DesignerPage = () => {
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white p-4 rounded-md shadow-lg">
             Loading templates...
+          </div>
+        </div>
+      )}
+
+      {!user && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Authentication Required</h2>
+            <p className="mb-4">You need to be logged in to use the template designer.</p>
+            <div className="flex justify-end">
+              <Button onClick={() => window.location.href = "/auth"}>
+                Log In / Sign Up
+              </Button>
+            </div>
           </div>
         </div>
       )}

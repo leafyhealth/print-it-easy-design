@@ -2,14 +2,79 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Edit, Trash } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 const TemplatesList = () => {
-  // Mock data - in a real app, this would come from API or context
-  const templates = [
-    { id: 1, name: 'Shipping Label', description: '4×6″ shipping label with barcode', lastModified: '2023-04-24' },
-    { id: 2, name: 'Product Tag', description: '3×2″ product price tag', lastModified: '2023-04-22' },
-    { id: 3, name: 'Return Label', description: '4×6″ return shipping label', lastModified: '2023-04-20' },
-  ];
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  
+  // Fetch templates from Supabase
+  const { data: templates, isLoading } = useQuery({
+    queryKey: ['templates'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('templates')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        toast({
+          title: 'Error fetching templates',
+          description: error.message,
+          variant: 'destructive'
+        });
+        return [];
+      }
+
+      return data || [];
+    }
+  });
+
+  // Delete template mutation
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      const { error } = await supabase
+        .from('templates')
+        .delete()
+        .eq('id', templateId);
+        
+      if (error) throw error;
+      return templateId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
+      toast({ title: 'Template deleted successfully' });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: 'Failed to delete template', 
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  });
+
+  const handleEdit = (templateId: string) => {
+    navigate(`/designer?template=${templateId}`);
+  };
+
+  const handleDelete = (templateId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm('Are you sure you want to delete this template?')) {
+      deleteTemplateMutation.mutate(templateId);
+    }
+  };
+  
+  if (isLoading) {
+    return <div className="text-center py-8">Loading templates...</div>;
+  }
+  
+  if (!templates || templates.length === 0) {
+    return <div className="text-center py-8 text-gray-500">No templates found. Create your first template!</div>;
+  }
   
   return (
     <div className="space-y-2">
@@ -22,13 +87,25 @@ const TemplatesList = () => {
             <div>
               <div className="font-medium">{template.name}</div>
               <div className="text-xs text-gray-500">{template.description}</div>
-              <div className="text-xs text-gray-500 mt-1">Last modified: {template.lastModified}</div>
+              <div className="text-xs text-gray-500 mt-1">
+                Last modified: {new Date(template.updated_at).toLocaleDateString()}
+              </div>
             </div>
             <div className="flex space-x-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8"
+                onClick={() => handleEdit(template.id)}
+              >
                 <Edit className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-red-600"
+                onClick={(e) => handleDelete(template.id, e)}
+              >
                 <Trash className="h-4 w-4" />
               </Button>
             </div>
