@@ -61,7 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <ScrollArea className="flex-1">
           <TabsContent value="elements" className="p-4 mt-0">
             <h3 className="font-medium mb-3">Elements</h3>
-            <ElementsList />
+            <ElementsList templateId={selectedTemplateId} />
             <div className="mt-5">
               <h3 className="font-medium mb-3">Properties</h3>
               <ElementProperties />
@@ -113,19 +113,55 @@ const Sidebar: React.FC<SidebarProps> = ({
           <TabsContent value="objects" className="p-4 mt-0">
             <h3 className="font-medium mb-3">Add Elements</h3>
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" className="h-20 flex-col justify-center">
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col justify-center"
+                onClick={() => {
+                  const event = new CustomEvent('add-element', { 
+                    detail: { type: 'text' } 
+                  });
+                  document.dispatchEvent(event);
+                }}
+              >
                 <Text className="h-6 w-6 mb-1" />
                 <span>Text</span>
               </Button>
-              <Button variant="outline" className="h-20 flex-col justify-center">
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col justify-center"
+                onClick={() => {
+                  const event = new CustomEvent('add-element', { 
+                    detail: { type: 'barcode' } 
+                  });
+                  document.dispatchEvent(event);
+                }}
+              >
                 <Barcode className="h-6 w-6 mb-1" />
                 <span>Barcode</span>
               </Button>
-              <Button variant="outline" className="h-20 flex-col justify-center">
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col justify-center"
+                onClick={() => {
+                  const event = new CustomEvent('add-element', { 
+                    detail: { type: 'image' } 
+                  });
+                  document.dispatchEvent(event);
+                }}
+              >
                 <Image className="h-6 w-6 mb-1" />
                 <span>Image</span>
               </Button>
-              <Button variant="outline" className="h-20 flex-col justify-center">
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col justify-center"
+                onClick={() => {
+                  const event = new CustomEvent('add-element', { 
+                    detail: { type: 'shape' } 
+                  });
+                  document.dispatchEvent(event);
+                }}
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mb-1" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M5 4a1 1 0 011-1h8a1 1 0 011 1v4a1 1 0 01-1 1H6a1 1 0 01-1-1V4zm4 8a1 1 0 00-1 1v2a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>

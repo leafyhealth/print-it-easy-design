@@ -3,7 +3,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { LabelTemplate, DesignElement } from '@/types/designer';
+import { DesignElement } from '@/types/designer';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { Trash, Save, Image, Text, SquarePlus } from 'lucide-react';
@@ -60,7 +60,7 @@ const Canvas: React.FC<CanvasProps> = ({
       size: { width: number; height: number };
       rotation: number;
       layer: number;
-      properties: Record<string, any>;
+      properties: any;
     }) => {
       if (!templateId) {
         throw new Error('No template selected');
@@ -161,6 +161,15 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // Add a text element
   const handleAddTextElement = () => {
+    if (!templateId) {
+      toast({
+        title: 'No template selected',
+        description: 'Please select or create a template first.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     const newTextElement = {
       type: 'text',
       name: 'New Text',
@@ -185,6 +194,15 @@ const Canvas: React.FC<CanvasProps> = ({
   
   // Add an image element
   const handleAddImageElement = () => {
+    if (!templateId) {
+      toast({
+        title: 'No template selected',
+        description: 'Please select or create a template first.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     const newImageElement = {
       type: 'image',
       name: 'New Image',
@@ -203,6 +221,15 @@ const Canvas: React.FC<CanvasProps> = ({
   
   // Add a barcode element
   const handleAddBarcodeElement = () => {
+    if (!templateId) {
+      toast({
+        title: 'No template selected',
+        description: 'Please select or create a template first.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     const newBarcodeElement = {
       type: 'barcode',
       name: 'New Barcode',
@@ -227,7 +254,8 @@ const Canvas: React.FC<CanvasProps> = ({
     } else {
       toast({
         title: 'No element selected',
-        description: 'Please select an element to delete'
+        description: 'Please select an element to delete',
+        variant: 'destructive'
       });
     }
   };
@@ -236,11 +264,25 @@ const Canvas: React.FC<CanvasProps> = ({
   const handleElementClick = (elementId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedElement(elementId);
+    
+    // Let parent components know about selection
+    const event = new CustomEvent('element-selected', { 
+      detail: { elementId } 
+    });
+    document.dispatchEvent(event);
   };
   
   // Handle drag start
   const handleDragStart = (e: React.MouseEvent, elementId: string) => {
-    if (!selectedElement || selectedElement !== elementId) return;
+    if (!selectedElement || selectedElement !== elementId) {
+      setSelectedElement(elementId);
+      
+      // Let parent components know about selection
+      const event = new CustomEvent('element-selected', { 
+        detail: { elementId } 
+      });
+      document.dispatchEvent(event);
+    }
     
     setIsDragging(true);
     setDragStartPos({ 
@@ -317,6 +359,10 @@ const Canvas: React.FC<CanvasProps> = ({
   // Handle canvas click (deselect)
   const handleCanvasClick = () => {
     setSelectedElement(null);
+    
+    // Let parent components know about deselection
+    const event = new CustomEvent('element-deselected');
+    document.dispatchEvent(event);
   };
 
   // Render elements
@@ -408,7 +454,7 @@ const Canvas: React.FC<CanvasProps> = ({
           
           {(!templateElements || templateElements.length === 0) && (
             <div className="absolute inset-0 p-4 text-center flex items-center justify-center text-gray-400">
-              <p>Drag elements from the sidebar or click the buttons above to start designing your label</p>
+              <p>Select a template and add elements using the buttons above to start designing</p>
             </div>
           )}
           
