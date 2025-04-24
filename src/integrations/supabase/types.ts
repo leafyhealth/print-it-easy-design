@@ -9,7 +9,92 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      template_elements: {
+        Row: {
+          created_at: string | null
+          id: string
+          layer: number | null
+          name: string
+          position: Json
+          properties: Json
+          rotation: number | null
+          size: Json
+          template_id: string | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          layer?: number | null
+          name: string
+          position?: Json
+          properties: Json
+          rotation?: number | null
+          size?: Json
+          template_id?: string | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          layer?: number | null
+          name?: string
+          position?: Json
+          properties?: Json
+          rotation?: number | null
+          size?: Json
+          template_id?: string | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_elements_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      templates: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          grid_settings: Json | null
+          height: number
+          id: string
+          name: string
+          updated_at: string | null
+          user_id: string | null
+          width: number
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          grid_settings?: Json | null
+          height: number
+          id?: string
+          name: string
+          updated_at?: string | null
+          user_id?: string | null
+          width: number
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          grid_settings?: Json | null
+          height?: number
+          id?: string
+          name?: string
+          updated_at?: string | null
+          user_id?: string | null
+          width?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
