@@ -10,6 +10,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { Position } from '@/types/designer';
 
 interface ElementsListProps {
   templateId?: string;
@@ -103,12 +104,13 @@ const ElementsList: React.FC<ElementsListProps> = ({ templateId }) => {
       if (fetchError) throw fetchError;
       
       // Create a new element with slightly offset position
+      const position = elementToDuplicate.position as unknown as Position;
       const newElement = {
         ...elementToDuplicate,
         id: undefined, // Let the database generate a new ID
         position: {
-          x: elementToDuplicate.position.x + 20,
-          y: elementToDuplicate.position.y + 20
+          x: position.x + 20,
+          y: position.y + 20
         },
         name: `${elementToDuplicate.name} (Copy)`
       };
@@ -224,8 +226,8 @@ const ElementsList: React.FC<ElementsListProps> = ({ templateId }) => {
             <div>
               <div className="text-sm font-medium">{element.name}</div>
               <div className="text-xs text-gray-500 truncate w-36">
-                {element.type === 'text' && element.properties?.content}
-                {element.type === 'barcode' && element.properties?.content}
+                {element.type === 'text' && (element.properties as any)?.content}
+                {element.type === 'barcode' && (element.properties as any)?.content}
                 {element.type === 'image' && 'Image'}
               </div>
             </div>
