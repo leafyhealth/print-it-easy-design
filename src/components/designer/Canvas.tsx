@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -7,6 +7,9 @@ import { DesignElement } from '@/types/designer';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { Trash, Save, Image, Text, SquarePlus } from 'lucide-react';
+import TextEditor from './TextEditor';
+import ImageUploader from './ImageUploader';
+import BarcodeEditor from './BarcodeEditor';
 
 interface CanvasProps {
   width?: number;
@@ -25,6 +28,17 @@ const Canvas: React.FC<CanvasProps> = ({
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+  const [showTextEditor, setShowTextEditor] = useState(false);
+  const [showImageUploader, setShowImageUploader] = useState(false);
+  const [showBarcodeEditor, setShowBarcodeEditor] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeStartData, setResizeStartData] = useState<{
+    startX: number;
+    startY: number;
+    startWidth: number;
+    startHeight: number;
+    direction: string;
+  } | null>(null);
   
   // Fetch template elements
   const { data: templateElements, isLoading } = useQuery({
@@ -50,6 +64,11 @@ const Canvas: React.FC<CanvasProps> = ({
     },
     enabled: !!templateId
   });
+
+  // Get the selected element
+  const selectedElementData = templateElements?.find(
+    (element) => element.id === selectedElement
+  );
 
   // Mutation to add a new element
   const addElementMutation = useMutation({
@@ -104,10 +123,21 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // Mutation to update an element
   const updateElementMutation = useMutation({
-    mutationFn: async ({ id, position }: { id: string, position: { x: number, y: number } }) => {
+    mutationFn: async ({ 
+      id, 
+      updates
+    }: { 
+      id: string, 
+      updates: Partial<{
+        position: { x: number, y: number };
+        size: { width: number, height: number };
+        properties: any;
+        name: string;
+      }> 
+    }) => {
       const { data, error } = await supabase
         .from('template_elements')
-        .update({ position })
+        .update(updates)
         .eq('id', id)
         .select()
         .single();
@@ -203,15 +233,20 @@ const Canvas: React.FC<CanvasProps> = ({
       return;
     }
     
+    setShowImageUploader(true);
+  };
+  
+  // Handle image selection from uploader
+  const handleImageSelect = (imageUrl: string) => {
     const newImageElement = {
       type: 'image',
       name: 'New Image',
-      position: { x: 200, y: 50 },
-      size: { width: 120, height: 120 },
+      position: { x: 100, y: 100 },
+      size: { width: 150, height: 150 },
       rotation: 0,
       layer: 0,
       properties: {
-        src: 'https://via.placeholder.com/120',
+        src: imageUrl,
         objectFit: 'contain'
       }
     };
@@ -230,21 +265,49 @@ const Canvas: React.FC<CanvasProps> = ({
       return;
     }
     
+    setShowBarcodeEditor(true);
+  };
+  
+  // Handle barcode configuration
+  const handleBarcodeConfigured = (barcodeProps: any) => {
     const newBarcodeElement = {
       type: 'barcode',
       name: 'New Barcode',
-      position: { x: 350, y: 50 },
-      size: { width: 150, height: 80 },
+      position: { x: 100, y: 150 },
+      size: { width: barcodeProps.width, height: barcodeProps.height },
       rotation: 0,
       layer: 0,
       properties: {
-        content: '123456789',
-        barcodeType: 'code128',
-        showText: true
+        ...barcodeProps
       }
     };
 
     addElementMutation.mutate(newBarcodeElement);
+  };
+  
+  // Edit text element
+  const handleEditText = () => {
+    if (selectedElement && selectedElementData?.type === 'text') {
+      setShowTextEditor(true);
+    } else {
+      toast({
+        title: 'No text element selected',
+        description: 'Please select a text element to edit',
+        variant: 'destructive'
+      });
+    }
+  };
+  
+  // Save text changes
+  const handleSaveTextChanges = (textProperties: any) => {
+    if (selectedElement) {
+      updateElementMutation.mutate({
+        id: selectedElement,
+        updates: {
+          properties: textProperties
+        }
+      });
+    }
   };
   
   // Delete selected element
@@ -257,6 +320,27 @@ const Canvas: React.FC<CanvasProps> = ({
         description: 'Please select an element to delete',
         variant: 'destructive'
       });
+    }
+  };
+  
+  // Double click to edit elements
+  const handleElementDoubleClick = (elementId: string, elementType: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedElement(elementId);
+    
+    switch (elementType) {
+      case 'text':
+        setShowTextEditor(true);
+        break;
+      case 'image':
+        // Open image editor or image selector
+        setShowImageUploader(true);
+        break;
+      case 'barcode':
+        setShowBarcodeEditor(true);
+        break;
+      default:
+        break;
     }
   };
   
@@ -337,24 +421,129 @@ const Canvas: React.FC<CanvasProps> = ({
     // Save final position to database
     updateElementMutation.mutate({ 
       id: element.id, 
-      position: element.position as any 
+      updates: { position: element.position as any } 
     });
     
     setIsDragging(false);
   }, [isDragging, selectedElement, templateElements, updateElementMutation]);
   
-  // Set up mouse move and mouse up event listeners for dragging
+  // Handle resize start
+  const handleResizeStart = (e: React.MouseEvent, elementId: string, direction: string) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    if (!templateElements) return;
+    const element = templateElements.find(el => el.id === elementId);
+    if (!element) return;
+    
+    setSelectedElement(elementId);
+    setIsResizing(true);
+    setResizeStartData({
+      startX: e.clientX,
+      startY: e.clientY,
+      startWidth: (element.size as any).width,
+      startHeight: (element.size as any).height,
+      direction
+    });
+  };
+  
+  // Handle resize
+  const handleResize = useCallback((e: MouseEvent) => {
+    if (!isResizing || !selectedElement || !templateElements || !resizeStartData) return;
+    
+    const element = templateElements.find(el => el.id === selectedElement);
+    if (!element) return;
+    
+    let newWidth = resizeStartData.startWidth;
+    let newHeight = resizeStartData.startHeight;
+    
+    const deltaX = e.clientX - resizeStartData.startX;
+    const deltaY = e.clientY - resizeStartData.startY;
+    
+    // Calculate new dimensions based on resize direction
+    if (resizeStartData.direction.includes('e')) {
+      newWidth = Math.max(20, resizeStartData.startWidth + deltaX);
+    }
+    if (resizeStartData.direction.includes('w')) {
+      newWidth = Math.max(20, resizeStartData.startWidth - deltaX);
+    }
+    if (resizeStartData.direction.includes('s')) {
+      newHeight = Math.max(20, resizeStartData.startHeight + deltaY);
+    }
+    if (resizeStartData.direction.includes('n')) {
+      newHeight = Math.max(20, resizeStartData.startHeight - deltaY);
+    }
+    
+    // Update element size visually (optimistic update)
+    const updatedElements = templateElements.map(el => {
+      if (el.id === selectedElement) {
+        const newElement = { ...el };
+        newElement.size = { width: newWidth, height: newHeight };
+        
+        // If resizing from left or top, also adjust position
+        if (resizeStartData.direction.includes('w')) {
+          const deltaPos = resizeStartData.startWidth - newWidth;
+          newElement.position = { 
+            x: (element.position as any).x + deltaPos, 
+            y: (element.position as any).y 
+          };
+        }
+        if (resizeStartData.direction.includes('n')) {
+          const deltaPos = resizeStartData.startHeight - newHeight;
+          newElement.position = { 
+            x: (element.position as any).x, 
+            y: (element.position as any).y + deltaPos 
+          };
+        }
+        
+        return newElement;
+      }
+      return el;
+    });
+    
+    // Update queryClient cache for immediate visual feedback
+    queryClient.setQueryData(['template-elements', templateId], updatedElements);
+  }, [isResizing, selectedElement, resizeStartData, templateElements, queryClient, templateId]);
+  
+  // Handle resize end
+  const handleResizeEnd = useCallback(() => {
+    if (!isResizing || !selectedElement || !templateElements) return;
+    
+    const element = templateElements.find(el => el.id === selectedElement);
+    if (!element) return;
+    
+    // Save final size to database
+    updateElementMutation.mutate({ 
+      id: element.id, 
+      updates: { 
+        size: element.size as any,
+        position: element.position as any
+      } 
+    });
+    
+    setIsResizing(false);
+    setResizeStartData(null);
+  }, [isResizing, selectedElement, templateElements, updateElementMutation]);
+  
+  // Set up mouse move and mouse up event listeners for dragging and resizing
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleDrag);
       window.addEventListener('mouseup', handleDragEnd);
     }
     
+    if (isResizing) {
+      window.addEventListener('mousemove', handleResize);
+      window.addEventListener('mouseup', handleResizeEnd);
+    }
+    
     return () => {
       window.removeEventListener('mousemove', handleDrag);
       window.removeEventListener('mouseup', handleDragEnd);
+      window.removeEventListener('mousemove', handleResize);
+      window.removeEventListener('mouseup', handleResizeEnd);
     };
-  }, [isDragging, handleDrag, handleDragEnd]);
+  }, [isDragging, isResizing, handleDrag, handleDragEnd, handleResize, handleResizeEnd]);
 
   // Handle canvas click (deselect)
   const handleCanvasClick = () => {
@@ -364,58 +553,166 @@ const Canvas: React.FC<CanvasProps> = ({
     const event = new CustomEvent('element-deselected');
     document.dispatchEvent(event);
   };
+  
+  // Render resize handles for selected element
+  const renderResizeHandles = (elementId: string) => {
+    if (selectedElement !== elementId) return null;
+    
+    const directions = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
+    return directions.map(dir => {
+      const handleStyle: React.CSSProperties = {
+        position: 'absolute',
+        width: '8px',
+        height: '8px',
+        backgroundColor: 'white',
+        border: '1px solid #0284c7',
+        cursor: `${dir}-resize`
+      };
+      
+      // Position handles based on direction
+      switch (dir) {
+        case 'n': 
+          handleStyle.top = '-4px';
+          handleStyle.left = 'calc(50% - 4px)';
+          break;
+        case 'ne':
+          handleStyle.top = '-4px';
+          handleStyle.right = '-4px';
+          break;
+        case 'e':
+          handleStyle.top = 'calc(50% - 4px)';
+          handleStyle.right = '-4px';
+          break;
+        case 'se':
+          handleStyle.bottom = '-4px';
+          handleStyle.right = '-4px';
+          break;
+        case 's':
+          handleStyle.bottom = '-4px';
+          handleStyle.left = 'calc(50% - 4px)';
+          break;
+        case 'sw':
+          handleStyle.bottom = '-4px';
+          handleStyle.left = '-4px';
+          break;
+        case 'w':
+          handleStyle.top = 'calc(50% - 4px)';
+          handleStyle.left = '-4px';
+          break;
+        case 'nw':
+          handleStyle.top = '-4px';
+          handleStyle.left = '-4px';
+          break;
+      }
+      
+      return (
+        <div
+          key={`${elementId}-${dir}`}
+          style={handleStyle}
+          onMouseDown={(e) => handleResizeStart(e, elementId, dir)}
+        />
+      );
+    });
+  };
 
   // Render elements
   const renderElements = () => {
     if (!templateElements || templateElements.length === 0) return null;
 
-    return templateElements.map((element) => (
-      <div
-        key={element.id}
-        className={cn(
-          "absolute border-2 cursor-move",
-          selectedElement === element.id 
-            ? "border-designer-primary z-10" 
-            : "border-transparent hover:border-designer-primary/50"
-        )}
-        style={{
-          left: `${(element.position as any).x}px`,
-          top: `${(element.position as any).y}px`,
-          width: `${(element.size as any).width}px`,
-          height: `${(element.size as any).height}px`,
-          transform: `rotate(${element.rotation}deg)`
-        }}
-        onClick={(e) => handleElementClick(element.id, e)}
-        onMouseDown={(e) => handleDragStart(e, element.id)}
-      >
-        {element.type === 'text' && (
-          <div 
-            className="w-full h-full flex items-center justify-center"
-            style={{
-              fontFamily: (element.properties as any).fontFamily,
-              fontSize: `${(element.properties as any).fontSize}px`,
-              color: (element.properties as any).color
-            }}
-          >
-            {(element.properties as any).content || 'Sample Text'}
-          </div>
-        )}
-        
-        {element.type === 'image' && (
-          <img 
-            src={(element.properties as any).src} 
-            alt={element.name}
-            className="w-full h-full object-contain"
-          />
-        )}
-        
-        {element.type === 'barcode' && (
-          <div className="w-full h-full flex items-center justify-center bg-gray-100">
-            <div className="text-xs">{element.name}: {(element.properties as any).content}</div>
-          </div>
-        )}
-      </div>
-    ));
+    return templateElements.map((element) => {
+      const position = element.position as any;
+      const size = element.size as any;
+      const properties = element.properties as any;
+      
+      return (
+        <div
+          key={element.id}
+          className={cn(
+            "absolute border-2 cursor-move",
+            selectedElement === element.id 
+              ? "border-designer-primary z-10" 
+              : "border-transparent hover:border-designer-primary/50"
+          )}
+          style={{
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+            width: `${size.width}px`,
+            height: `${size.height}px`,
+            transform: `rotate(${element.rotation}deg)`
+          }}
+          onClick={(e) => handleElementClick(element.id, e)}
+          onMouseDown={(e) => handleDragStart(e, element.id)}
+          onDoubleClick={(e) => handleElementDoubleClick(element.id, element.type, e)}
+        >
+          {element.type === 'text' && (
+            <div 
+              className="w-full h-full flex items-center overflow-hidden"
+              style={{
+                fontFamily: properties.fontFamily || 'Arial',
+                fontSize: `${properties.fontSize || 16}px`,
+                fontWeight: properties.fontWeight || 'normal',
+                fontStyle: properties.fontStyle || 'normal',
+                textAlign: properties.textAlign || 'left',
+                textDecoration: properties.textDecoration || 'none',
+                color: properties.color || '#000000',
+                padding: '4px'
+              }}
+            >
+              {properties.content || 'Sample Text'}
+            </div>
+          )}
+          
+          {element.type === 'image' && (
+            <img 
+              src={properties.src} 
+              alt={element.name}
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/200x200?text=Image+Error';
+              }}
+            />
+          )}
+          
+          {element.type === 'barcode' && (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-white p-1">
+              {/* Simulate barcode display - this should be replaced with actual barcode rendering */}
+              <div style={{ 
+                width: '80%', 
+                height: properties.showText ? '70%' : '100%', 
+                display: 'flex',
+                justifyContent: 'space-between',
+                padding: '0 5px',
+                backgroundColor: properties.backgroundColor || 'white'
+              }}>
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div 
+                    key={i} 
+                    style={{ 
+                      width: (i % 3 === 0) ? '4px' : '2px', 
+                      height: '100%', 
+                      backgroundColor: properties.foregroundColor || 'black' 
+                    }}
+                  ></div>
+                ))}
+              </div>
+              
+              {properties.showText && (
+                <div style={{ 
+                  marginTop: '5px',
+                  fontSize: '12px',
+                  color: properties.foregroundColor || 'black',
+                  textAlign: 'center'
+                }}>
+                  {properties.content || '123456789'}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {renderResizeHandles(element.id)}
+        </div>
+      );
+    });
   };
 
   return (
@@ -434,10 +731,20 @@ const Canvas: React.FC<CanvasProps> = ({
             <SquarePlus className="h-4 w-4" />
             Add Barcode
           </Button>
-          <Button onClick={handleDeleteElement} variant="outline" disabled={!selectedElement} className="flex items-center gap-1 text-red-500">
-            <Trash className="h-4 w-4" />
-            Delete
-          </Button>
+          
+          {selectedElement && selectedElementData?.type === 'text' && (
+            <Button onClick={handleEditText} variant="outline" className="flex items-center gap-1">
+              <Text className="h-4 w-4" />
+              Edit Text
+            </Button>
+          )}
+          
+          {selectedElement && (
+            <Button onClick={handleDeleteElement} variant="outline" className="flex items-center gap-1 text-red-500">
+              <Trash className="h-4 w-4" />
+              Delete
+            </Button>
+          )}
         </div>
         <div
           className={cn(
@@ -465,6 +772,38 @@ const Canvas: React.FC<CanvasProps> = ({
           )}
         </div>
       </div>
+      
+      {/* Text Editor Dialog */}
+      <TextEditor
+        open={showTextEditor}
+        onOpenChange={setShowTextEditor}
+        onSave={handleSaveTextChanges}
+        initialProperties={
+          selectedElementData?.type === 'text'
+            ? (selectedElementData?.properties as any)
+            : undefined
+        }
+      />
+      
+      {/* Image Uploader Dialog */}
+      <ImageUploader
+        open={showImageUploader}
+        onOpenChange={setShowImageUploader}
+        onImageSelect={handleImageSelect}
+        templateId={templateId}
+      />
+      
+      {/* Barcode Editor Dialog */}
+      <BarcodeEditor
+        open={showBarcodeEditor}
+        onOpenChange={setShowBarcodeEditor}
+        onSave={handleBarcodeConfigured}
+        initialProperties={
+          selectedElementData?.type === 'barcode'
+            ? (selectedElementData?.properties as any)
+            : undefined
+        }
+      />
     </div>
   );
 };

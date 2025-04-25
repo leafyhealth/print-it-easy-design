@@ -4,23 +4,17 @@ import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
 import Canvas from '../components/designer/Canvas';
 import Footer from '../components/layout/Footer';
+import PaperTemplateSelector from '../components/designer/PaperTemplateSelector';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 
 const DesignerPage = () => {
   const queryClient = useQueryClient();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newTemplate, setNewTemplate] = useState({
-    name: '',
-    description: '',
-    width: 600,
-    height: 400
-  });
+  const [showPaperTemplateSelector, setShowPaperTemplateSelector] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
   const [user, setUser] = useState<any>(null);
 
@@ -29,6 +23,11 @@ const DesignerPage = () => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      
+      // If user is logged in but no template is selected, show the paper template dialog
+      if (user && !selectedTemplateId) {
+        setShowPaperTemplateSelector(true);
+      }
     };
 
     getUser();
@@ -67,22 +66,58 @@ const DesignerPage = () => {
     }
   });
 
-  // Create a new template
+  // Create a new template with advanced paper configuration
   const createTemplateMutation = useMutation({
-    mutationFn: async (template: typeof newTemplate) => {
+    mutationFn: async (templateSettings: {
+      name: string;
+      description: string;
+      paperFormat: string;
+      paperWidth: number;
+      paperHeight: number;
+      unit: string;
+      labelLayout: string;
+      columns: number;
+      rows: number;
+      labelWidth: number;
+      labelHeight: number;
+    }) => {
       // Check if user is authenticated
       if (!user) {
         throw new Error('You must be logged in to create a template');
       }
 
+      // We'll save the template with the width and height in pixels
+      // For unit conversion: 1 inch = 96px, 1mm = 3.78px (approximation)
+      let widthInPixels = templateSettings.labelWidth;
+      let heightInPixels = templateSettings.labelHeight;
+      
+      if (templateSettings.unit === 'in') {
+        widthInPixels = templateSettings.labelWidth * 96;
+        heightInPixels = templateSettings.labelHeight * 96;
+      } else if (templateSettings.unit === 'mm') {
+        widthInPixels = templateSettings.labelWidth * 3.78;
+        heightInPixels = templateSettings.labelHeight * 3.78;
+      }
+
       const { data, error } = await supabase
         .from('templates')
         .insert({
-          name: template.name,
-          description: template.description,
-          width: template.width,
-          height: template.height,
-          user_id: user.id // Set the user_id field to the current user's ID
+          name: templateSettings.name,
+          description: templateSettings.description,
+          width: Math.round(widthInPixels),
+          height: Math.round(heightInPixels),
+          user_id: user.id,
+          grid_settings: {
+            showGrid: true,
+            gridSize: 10,
+            paperFormat: templateSettings.paperFormat,
+            paperWidth: templateSettings.paperWidth,
+            paperHeight: templateSettings.paperHeight,
+            unit: templateSettings.unit,
+            labelLayout: templateSettings.labelLayout,
+            columns: templateSettings.columns,
+            rows: templateSettings.rows
+          }
         })
         .select()
         .single();
@@ -96,15 +131,7 @@ const DesignerPage = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['templates'] });
       setSelectedTemplateId(data.id);
-      setShowCreateDialog(false);
-      
-      // Reset form
-      setNewTemplate({
-        name: '',
-        description: '',
-        width: 600,
-        height: 400
-      });
+      setShowPaperTemplateSelector(false);
       
       toast({
         title: 'Template Created',
@@ -119,19 +146,6 @@ const DesignerPage = () => {
       });
     }
   });
-
-  const handleCreateTemplate = () => {
-    if (!newTemplate.name) {
-      toast({
-        title: 'Error',
-        description: 'Template name is required',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    createTemplateMutation.mutate(newTemplate);
-  };
 
   // Handle element addition from sidebar
   useEffect(() => {
@@ -164,40 +178,6 @@ const DesignerPage = () => {
     };
   }, []);
 
-  // Listen for canvas-specific element events
-  useEffect(() => {
-    const handleAddTextElement = () => {
-      const addTextButton = document.querySelector('button:has(.h-4.w-4:first-child)') as HTMLButtonElement | null;
-      if (addTextButton) {
-        addTextButton.click();
-      }
-    };
-    
-    const handleAddImageElement = () => {
-      const buttons = document.querySelectorAll('button:has(.h-4.w-4:first-child)');
-      if (buttons.length >= 2) {
-        (buttons[1] as HTMLButtonElement).click();
-      }
-    };
-    
-    const handleAddBarcodeElement = () => {
-      const buttons = document.querySelectorAll('button:has(.h-4.w-4:first-child)');
-      if (buttons.length >= 3) {
-        (buttons[2] as HTMLButtonElement).click();
-      }
-    };
-
-    document.addEventListener('add-text-element', handleAddTextElement);
-    document.addEventListener('add-image-element', handleAddImageElement);
-    document.addEventListener('add-barcode-element', handleAddBarcodeElement);
-    
-    return () => {
-      document.removeEventListener('add-text-element', handleAddTextElement);
-      document.removeEventListener('add-image-element', handleAddImageElement);
-      document.removeEventListener('add-barcode-element', handleAddBarcodeElement);
-    };
-  }, []);
-
   return (
     <div className="flex flex-col h-screen">
       <Header />
@@ -205,7 +185,7 @@ const DesignerPage = () => {
         <div className="w-72">
           <Sidebar 
             templates={templates || []} 
-            onCreateTemplate={() => setShowCreateDialog(true)}
+            onCreateTemplate={() => setShowPaperTemplateSelector(true)}
             onSelectTemplate={(id) => setSelectedTemplateId(id)}
             selectedTemplateId={selectedTemplateId}
           />
@@ -221,65 +201,12 @@ const DesignerPage = () => {
       </div>
       <Footer />
 
-      {/* Create template dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Template</DialogTitle>
-            <DialogDescription>
-              Create a new label template with custom dimensions and properties.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="name" className="text-right">Name</label>
-              <Input
-                id="name"
-                value={newTemplate.name}
-                onChange={(e) => setNewTemplate({...newTemplate, name: e.target.value})}
-                className="col-span-3"
-                placeholder="Template name"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="description" className="text-right">Description</label>
-              <Textarea
-                id="description"
-                value={newTemplate.description}
-                onChange={(e) => setNewTemplate({...newTemplate, description: e.target.value})}
-                className="col-span-3"
-                placeholder="Template description (optional)"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="width" className="text-right">Width (px)</label>
-              <Input
-                id="width"
-                type="number"
-                value={newTemplate.width}
-                onChange={(e) => setNewTemplate({...newTemplate, width: parseInt(e.target.value) || 0})}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="height" className="text-right">Height (px)</label>
-              <Input
-                id="height"
-                type="number"
-                value={newTemplate.height}
-                onChange={(e) => setNewTemplate({...newTemplate, height: parseInt(e.target.value) || 0})}
-                className="col-span-3"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-            <Button onClick={handleCreateTemplate} disabled={createTemplateMutation.isPending || !user}>
-              {createTemplateMutation.isPending ? 'Creating...' : 'Create Template'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Paper/Label Template Selector */}
+      <PaperTemplateSelector
+        open={showPaperTemplateSelector}
+        onOpenChange={setShowPaperTemplateSelector}
+        onConfirm={(templateSettings) => createTemplateMutation.mutate(templateSettings)}
+      />
 
       {isLoading && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
