@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -775,11 +774,8 @@ const Canvas: React.FC<CanvasProps> = ({
   // Add event listeners for keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Delete key to remove selected element
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElement) {
-        e.preventDefault();
-        handleDeleteElement();
-      }
+      // We're removing the automatic delete functionality when Delete key is pressed
+      // as requested by the user
       
       // Ctrl+Z for undo (would need proper undo/redo implementation)
       if (e.key === 'z' && e.ctrlKey) {

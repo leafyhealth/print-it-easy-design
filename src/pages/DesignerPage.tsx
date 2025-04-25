@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { setupStorageBucket } from '@/lib/setupStorage';
 
 const DesignerPage = () => {
   const queryClient = useQueryClient();
@@ -18,7 +19,7 @@ const DesignerPage = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
   const [user, setUser] = useState<any>(null);
 
-  // Check if user is authenticated
+  // Check if user is authenticated and setup storage
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -28,14 +29,22 @@ const DesignerPage = () => {
       if (user && !selectedTemplateId) {
         setShowPaperTemplateSelector(true);
       }
+      
+      // Setup storage bucket
+      if (user) {
+        await setupStorageBucket();
+      }
     };
 
     getUser();
 
     // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setUser(session?.user || null);
+        if (session?.user) {
+          await setupStorageBucket();
+        }
       }
     );
 

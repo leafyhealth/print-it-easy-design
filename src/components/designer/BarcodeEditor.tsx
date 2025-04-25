@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { 
   Select,
   SelectContent,
@@ -17,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface BarcodeEditorProps {
   open: boolean;
@@ -28,8 +29,9 @@ interface BarcodeEditorProps {
     showText: boolean;
     width: number;
     height: number;
-    backgroundColor: string;
     foregroundColor: string;
+    backgroundColor: string;
+    url?: string;
   }) => void;
   initialProperties?: {
     content?: string;
@@ -37,8 +39,9 @@ interface BarcodeEditorProps {
     showText?: boolean;
     width?: number;
     height?: number;
-    backgroundColor?: string;
     foregroundColor?: string;
+    backgroundColor?: string;
+    url?: string;
   };
 }
 
@@ -46,10 +49,8 @@ const BARCODE_TYPES = [
   { id: 'code128', label: 'Code 128' },
   { id: 'code39', label: 'Code 39' },
   { id: 'ean13', label: 'EAN-13' },
-  { id: 'ean8', label: 'EAN-8' },
-  { id: 'upc', label: 'UPC' },
-  { id: 'qr', label: 'QR Code' },
-  { id: 'datamatrix', label: 'DataMatrix' }
+  { id: 'qrcode', label: 'QR Code' },
+  { id: 'datamatrix', label: 'Data Matrix' }
 ];
 
 const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
@@ -60,11 +61,13 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
 }) => {
   const [content, setContent] = useState(initialProperties.content || '123456789');
   const [barcodeType, setBarcodeType] = useState(initialProperties.barcodeType || 'code128');
-  const [showText, setShowText] = useState(initialProperties.showText !== false);
+  const [showText, setShowText] = useState(initialProperties.showText !== false); // Default to true
   const [width, setWidth] = useState(initialProperties.width || 150);
   const [height, setHeight] = useState(initialProperties.height || 80);
-  const [backgroundColor, setBackgroundColor] = useState(initialProperties.backgroundColor || '#ffffff');
   const [foregroundColor, setForegroundColor] = useState(initialProperties.foregroundColor || '#000000');
+  const [backgroundColor, setBackgroundColor] = useState(initialProperties.backgroundColor || '#FFFFFF');
+  const [url, setUrl] = useState(initialProperties.url || '');
+  const [activeTab, setActiveTab] = useState('content');
 
   // Update state when initialProperties change
   useEffect(() => {
@@ -73,8 +76,9 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
     if (initialProperties.showText !== undefined) setShowText(initialProperties.showText);
     if (initialProperties.width) setWidth(initialProperties.width);
     if (initialProperties.height) setHeight(initialProperties.height);
-    if (initialProperties.backgroundColor) setBackgroundColor(initialProperties.backgroundColor);
     if (initialProperties.foregroundColor) setForegroundColor(initialProperties.foregroundColor);
+    if (initialProperties.backgroundColor) setBackgroundColor(initialProperties.backgroundColor);
+    if (initialProperties.url) setUrl(initialProperties.url);
   }, [initialProperties]);
 
   const handleSave = () => {
@@ -84,95 +88,14 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
       showText,
       width,
       height,
+      foregroundColor,
       backgroundColor,
-      foregroundColor
+      url: url || undefined
     });
     onOpenChange(false);
   };
 
-  const renderBarcodePreview = () => {
-    // This is a placeholder. In a real implementation, we would use a proper barcode rendering library
-    if (barcodeType === 'qr' || barcodeType === 'datamatrix') {
-      return (
-        <div 
-          style={{ 
-            width: '100px', 
-            height: '100px', 
-            backgroundColor: foregroundColor,
-            position: 'relative',
-            margin: '0 auto'
-          }}
-        >
-          {/* Simulated QR code pattern */}
-          <div style={{ 
-            position: 'absolute', 
-            width: '25%', 
-            height: '25%', 
-            top: '10%', 
-            left: '10%', 
-            backgroundColor: backgroundColor 
-          }}></div>
-          <div style={{ 
-            position: 'absolute', 
-            width: '15%', 
-            height: '15%', 
-            top: '50%', 
-            left: '30%', 
-            backgroundColor: backgroundColor 
-          }}></div>
-          <div style={{ 
-            position: 'absolute', 
-            width: '20%', 
-            height: '30%', 
-            top: '40%', 
-            left: '60%', 
-            backgroundColor: backgroundColor 
-          }}></div>
-        </div>
-      );
-    } else {
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div 
-            style={{ 
-              width: '150px', 
-              height: '60px', 
-              display: 'flex', 
-              flexDirection: 'column',
-              backgroundColor: backgroundColor,
-              padding: '5px 0',
-            }}
-          >
-            {/* Simulated barcode lines */}
-            <div style={{ display: 'flex', height: '40px', justifyContent: 'space-between' }}>
-              {Array.from({ length: 15 }).map((_, i) => (
-                <div 
-                  key={i} 
-                  style={{ 
-                    width: i % 5 === 0 ? '3px' : '1px', 
-                    height: '100%', 
-                    backgroundColor: foregroundColor,
-                    marginRight: '3px'
-                  }}
-                ></div>
-              ))}
-            </div>
-            
-            {showText && (
-              <div style={{ 
-                textAlign: 'center', 
-                marginTop: '5px', 
-                fontSize: '12px',
-                color: foregroundColor
-              }}>
-                {content}
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-  };
+  const isQrCode = barcodeType === 'qrcode' || barcodeType === 'datamatrix';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -181,113 +104,192 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
           <DialogTitle>Configure Barcode</DialogTitle>
         </DialogHeader>
         
-        <div className="grid gap-4">
-          <div className="space-y-2">
-            <Label>Barcode Content</Label>
-            <Input
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Enter barcode content"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Barcode Type</Label>
-            <Select value={barcodeType} onValueChange={setBarcodeType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {BARCODE_TYPES.map((type) => (
-                  <SelectItem key={type.id} value={type.id}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Switch 
-              id="show-text"
-              checked={showText}
-              onCheckedChange={setShowText}
-            />
-            <Label htmlFor="show-text">Show text under barcode</Label>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid grid-cols-2">
+            <TabsTrigger value="content">Content</TabsTrigger>
+            <TabsTrigger value="appearance">Appearance</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="content" className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label>Width</Label>
-              <div className="flex items-center space-x-2">
-                <Input
+              <Label>Barcode Type</Label>
+              <Select value={barcodeType} onValueChange={setBarcodeType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BARCODE_TYPES.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Barcode Content</Label>
+              <Input 
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder={isQrCode ? "QR content or URL" : "123456789"}
+              />
+              <p className="text-xs text-muted-foreground">
+                {isQrCode 
+                  ? "Enter text or a URL to encode in the QR code" 
+                  : "Enter numbers or text for the barcode"}
+              </p>
+            </div>
+            
+            {isQrCode && (
+              <div className="space-y-2 border-t pt-4">
+                <Label>Link URL (Optional)</Label>
+                <Input 
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://example.com"
+                  type="url"
+                />
+                <p className="text-xs text-muted-foreground">
+                  When scanned, this URL will be opened. Leave empty if you don't want a link.
+                </p>
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="appearance" className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Show Text</Label>
+                <Switch 
+                  checked={showText} 
+                  onCheckedChange={setShowText} 
+                  disabled={isQrCode}
+                />
+              </div>
+              {isQrCode && (
+                <p className="text-xs text-muted-foreground">
+                  Text display is not available for QR codes
+                </p>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Width (px)</Label>
+                <Input 
                   type="number"
                   min="50"
                   max="500"
                   value={width}
                   onChange={(e) => setWidth(Number(e.target.value))}
                 />
-                <span>px</span>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Height</Label>
-              <div className="flex items-center space-x-2">
-                <Input
+              
+              <div className="space-y-2">
+                <Label>Height (px)</Label>
+                <Input 
                   type="number"
-                  min="30"
-                  max="300"
+                  min="50"
+                  max="500"
                   value={height}
                   onChange={(e) => setHeight(Number(e.target.value))}
                 />
-                <span>px</span>
               </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+            
             <div className="space-y-2">
-              <Label>Background Color</Label>
-              <div className="flex items-center space-x-2">
-                <Input
-                  type="color"
-                  value={backgroundColor}
-                  onChange={(e) => setBackgroundColor(e.target.value)}
-                  className="w-12 h-10 p-1"
-                />
-                <Input
-                  type="text"
-                  value={backgroundColor}
-                  onChange={(e) => setBackgroundColor(e.target.value)}
-                  className="flex-1"
-                />
+              <Label>Colors</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs">Foreground</Label>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <Input
+                      type="color"
+                      value={foregroundColor}
+                      onChange={(e) => setForegroundColor(e.target.value)}
+                      className="w-10 h-10 p-1"
+                    />
+                    <Input
+                      type="text"
+                      value={foregroundColor}
+                      onChange={(e) => setForegroundColor(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label className="text-xs">Background</Label>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <Input
+                      type="color"
+                      value={backgroundColor}
+                      onChange={(e) => setBackgroundColor(e.target.value)}
+                      className="w-10 h-10 p-1"
+                    />
+                    <Input
+                      type="text"
+                      value={backgroundColor}
+                      onChange={(e) => setBackgroundColor(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label>Barcode Color</Label>
-              <div className="flex items-center space-x-2">
-                <Input
-                  type="color"
-                  value={foregroundColor}
-                  onChange={(e) => setForegroundColor(e.target.value)}
-                  className="w-12 h-10 p-1"
-                />
-                <Input
-                  type="text"
-                  value={foregroundColor}
-                  onChange={(e) => setForegroundColor(e.target.value)}
-                  className="flex-1"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="border p-4 rounded-md">
-            <div className="text-sm font-medium mb-2">Preview</div>
-            <div className="p-2 border rounded flex items-center justify-center" style={{minHeight: '120px'}}>
-              {renderBarcodePreview()}
+          </TabsContent>
+        </Tabs>
+        
+        <div className="border p-4 rounded-md">
+          <div className="text-sm font-medium mb-2">Preview</div>
+          <div
+            className="p-2 border rounded flex items-center justify-center"
+            style={{ height: '100px', backgroundColor }}
+          >
+            {/* This is a simple representation - in a real app you'd render the actual barcode */}
+            <div className="flex flex-col items-center">
+              {barcodeType === 'qrcode' ? (
+                <div
+                  style={{ 
+                    width: '80px', 
+                    height: '80px', 
+                    backgroundColor: foregroundColor,
+                    clipPath: 'polygon(0% 0%, 0% 75%, 25% 75%, 25% 25%, 75% 25%, 75% 75%, 25% 75%, 25% 100%, 100% 100%, 100% 0%)'
+                  }}
+                ></div>
+              ) : (
+                <>
+                  <div style={{ 
+                    width: '100px', 
+                    height: '50px', 
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    {Array.from({ length: 15 }).map((_, i) => (
+                      <div 
+                        key={i} 
+                        style={{ 
+                          width: (i % 3 === 0) ? '4px' : '2px', 
+                          height: '100%', 
+                          backgroundColor: foregroundColor 
+                        }}
+                      ></div>
+                    ))}
+                  </div>
+                  
+                  {showText && !isQrCode && (
+                    <div style={{ 
+                      marginTop: '5px',
+                      fontSize: '12px',
+                      color: foregroundColor
+                    }}>
+                      {content || '123456789'}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -297,7 +299,7 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
             Cancel
           </Button>
           <Button onClick={handleSave}>
-            Apply Changes
+            Apply
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Upload, ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { setupStorageBucket } from '@/lib/setupStorage';
 
 interface ImageUploaderProps {
   open: boolean;
@@ -37,6 +38,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   React.useEffect(() => {
     if (open && templateId) {
       fetchRecentImages();
+    }
+    
+    // Ensure the bucket exists when the component is opened
+    if (open) {
+      setupStorageBucket();
     }
   }, [open, templateId]);
 
@@ -71,6 +77,16 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Check file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please select an image less than 2MB",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       setSelectedFile(file);
       
       // Create preview URL
@@ -88,7 +104,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     setUploading(true);
     
     try {
-      // Create a storage bucket if it doesn't exist
+      // Ensure bucket exists
+      await setupStorageBucket();
+      
+      // Create filename
       const fileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
       const filePath = `images/${fileName}`;
       
@@ -100,7 +119,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           upsert: false
         });
         
-      if (error) throw error;
+      if (error) {
+        console.error('Upload error details:', error);
+        throw error;
+      }
       
       // Get the public URL
       const { data: publicUrlData } = supabase.storage
