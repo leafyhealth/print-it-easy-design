@@ -6,10 +6,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DesignElement } from '@/types/designer';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
-import { Trash, Save, Image, Text, SquarePlus } from 'lucide-react';
+import { Trash, Save, Image, Text, SquarePlus, Printer, ZoomIn, ZoomOut, Ruler, Grid3x3 } from 'lucide-react';
 import TextEditor from './TextEditor';
 import ImageUploader from './ImageUploader';
 import BarcodeEditor from './BarcodeEditor';
+import ZoomControls from './ZoomControls';
+import VisualAidTools from './VisualAidTools';
 
 interface CanvasProps {
   width?: number;
@@ -25,6 +27,7 @@ const Canvas: React.FC<CanvasProps> = ({
   templateId,
 }) => {
   const queryClient = useQueryClient();
+  const canvasRef = useRef<HTMLDivElement>(null);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
@@ -40,6 +43,41 @@ const Canvas: React.FC<CanvasProps> = ({
     direction: string;
   } | null>(null);
   
+  // Canvas view settings
+  const [zoomLevel, setZoomLevel] = useState(100);
+  const [showRulers, setShowRulers] = useState(true);
+  const [showSnaplines, setShowSnaplines] = useState(true);
+  const [showMargins, setShowMargins] = useState(true);
+  const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStartPos, setPanStartPos] = useState({ x: 0, y: 0 });
+  
+  // Fetch template elements
+  const { data: template, isLoading: isTemplateLoading } = useQuery({
+    queryKey: ['template', templateId],
+    queryFn: async () => {
+      if (!templateId) return null;
+      
+      const { data, error } = await supabase
+        .from('templates')
+        .select('*')
+        .eq('id', templateId)
+        .single();
+
+      if (error) {
+        toast({
+          title: 'Error fetching template',
+          description: error.message,
+          variant: 'destructive'
+        });
+        return null;
+      }
+
+      return data;
+    },
+    enabled: !!templateId
+  });
+
   // Fetch template elements
   const { data: templateElements, isLoading } = useQuery({
     queryKey: ['template-elements', templateId],
@@ -385,8 +423,8 @@ const Canvas: React.FC<CanvasProps> = ({
     const element = templateElements.find(el => el.id === selectedElement);
     if (!element) return;
     
-    const deltaX = e.clientX - dragStartPos.x;
-    const deltaY = e.clientY - dragStartPos.y;
+    const deltaX = (e.clientX - dragStartPos.x) / (zoomLevel / 100);
+    const deltaY = (e.clientY - dragStartPos.y) / (zoomLevel / 100);
     
     const newPosition = {
       x: (element.position as any).x + deltaX,
@@ -409,7 +447,7 @@ const Canvas: React.FC<CanvasProps> = ({
     
     // Update queryClient cache for immediate visual feedback
     queryClient.setQueryData(['template-elements', templateId], updatedElements);
-  }, [isDragging, selectedElement, dragStartPos, templateElements, queryClient, templateId]);
+  }, [isDragging, selectedElement, dragStartPos, templateElements, queryClient, templateId, zoomLevel]);
   
   // Handle drag end
   const handleDragEnd = useCallback(() => {
@@ -457,8 +495,8 @@ const Canvas: React.FC<CanvasProps> = ({
     let newWidth = resizeStartData.startWidth;
     let newHeight = resizeStartData.startHeight;
     
-    const deltaX = e.clientX - resizeStartData.startX;
-    const deltaY = e.clientY - resizeStartData.startY;
+    const deltaX = (e.clientX - resizeStartData.startX) / (zoomLevel / 100);
+    const deltaY = (e.clientY - resizeStartData.startY) / (zoomLevel / 100);
     
     // Calculate new dimensions based on resize direction
     if (resizeStartData.direction.includes('e')) {
@@ -503,7 +541,7 @@ const Canvas: React.FC<CanvasProps> = ({
     
     // Update queryClient cache for immediate visual feedback
     queryClient.setQueryData(['template-elements', templateId], updatedElements);
-  }, [isResizing, selectedElement, resizeStartData, templateElements, queryClient, templateId]);
+  }, [isResizing, selectedElement, resizeStartData, templateElements, queryClient, templateId, zoomLevel]);
   
   // Handle resize end
   const handleResizeEnd = useCallback(() => {
@@ -525,6 +563,179 @@ const Canvas: React.FC<CanvasProps> = ({
     setResizeStartData(null);
   }, [isResizing, selectedElement, templateElements, updateElementMutation]);
   
+  // Handle canvas panning start
+  const handlePanStart = (e: React.MouseEvent) => {
+    // Only start panning with middle mouse button (button 1)
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      setIsPanning(true);
+      setPanStartPos({ x: e.clientX, y: e.clientY });
+      e.preventDefault();
+    }
+  };
+  
+  // Handle canvas panning
+  const handlePan = useCallback((e: MouseEvent) => {
+    if (!isPanning) return;
+    
+    const deltaX = e.clientX - panStartPos.x;
+    const deltaY = e.clientY - panStartPos.y;
+    
+    setCanvasPan(prev => ({
+      x: prev.x + deltaX,
+      y: prev.y + deltaY
+    }));
+    
+    setPanStartPos({ x: e.clientX, y: e.clientY });
+  }, [isPanning, panStartPos]);
+  
+  // Handle canvas panning end
+  const handlePanEnd = useCallback(() => {
+    setIsPanning(false);
+  }, []);
+
+  // Handle zoom with mouse wheel
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey) {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 10 : -10;
+      const newZoom = Math.max(25, Math.min(500, zoomLevel + delta));
+      setZoomLevel(newZoom);
+    }
+  };
+
+  // Zoom to fit document
+  const handleZoomFit = () => {
+    if (!canvasRef.current) return;
+    
+    const canvasEl = canvasRef.current;
+    const canvasWidth = canvasEl.clientWidth;
+    const canvasHeight = canvasEl.clientHeight;
+    
+    const scaleX = (canvasWidth - 40) / width;
+    const scaleY = (canvasHeight - 40) / height;
+    const scale = Math.min(scaleX, scaleY) * 100;
+    
+    setZoomLevel(scale);
+    setCanvasPan({ x: 0, y: 0 });
+  };
+  
+  // Zoom to fit all objects
+  const handleZoomObjects = () => {
+    if (!templateElements || templateElements.length === 0) {
+      handleZoomFit();
+      return;
+    }
+    
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    
+    templateElements.forEach(element => {
+      const position = element.position as any;
+      const size = element.size as any;
+      
+      minX = Math.min(minX, position.x);
+      minY = Math.min(minY, position.y);
+      maxX = Math.max(maxX, position.x + size.width);
+      maxY = Math.max(maxY, position.y + size.height);
+    });
+    
+    // Add padding
+    minX -= 20;
+    minY -= 20;
+    maxX += 20;
+    maxY += 20;
+    
+    const objectsWidth = maxX - minX;
+    const objectsHeight = maxY - minY;
+    
+    if (!canvasRef.current) return;
+    
+    const canvasEl = canvasRef.current;
+    const canvasWidth = canvasEl.clientWidth;
+    const canvasHeight = canvasEl.clientHeight;
+    
+    const scaleX = canvasWidth / objectsWidth;
+    const scaleY = canvasHeight / objectsHeight;
+    const scale = Math.min(scaleX, scaleY) * 100;
+    
+    setZoomLevel(Math.min(100, scale));
+    
+    // Center objects
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+    
+    setCanvasPan({
+      x: (canvasWidth / 2) - (centerX * (scale / 100)),
+      y: (canvasHeight / 2) - (centerY * (scale / 100))
+    });
+  };
+  
+  // Align selected elements horizontally
+  const handleAlignHorizontal = (position: 'start' | 'center' | 'end') => {
+    if (!selectedElement || !templateElements) return;
+    
+    const element = templateElements.find(el => el.id === selectedElement);
+    if (!element) return;
+    
+    let newX = (element.position as any).x;
+    
+    switch (position) {
+      case 'start': // Left align
+        newX = 0;
+        break;
+      case 'center': // Center align
+        newX = (width - (element.size as any).width) / 2;
+        break;
+      case 'end': // Right align
+        newX = width - (element.size as any).width;
+        break;
+    }
+    
+    updateElementMutation.mutate({
+      id: element.id,
+      updates: {
+        position: {
+          x: newX,
+          y: (element.position as any).y
+        }
+      }
+    });
+  };
+  
+  // Align selected elements vertically
+  const handleAlignVertical = (position: 'start' | 'center' | 'end') => {
+    if (!selectedElement || !templateElements) return;
+    
+    const element = templateElements.find(el => el.id === selectedElement);
+    if (!element) return;
+    
+    let newY = (element.position as any).y;
+    
+    switch (position) {
+      case 'start': // Top align
+        newY = 0;
+        break;
+      case 'center': // Middle align
+        newY = (height - (element.size as any).height) / 2;
+        break;
+      case 'end': // Bottom align
+        newY = height - (element.size as any).height;
+        break;
+    }
+    
+    updateElementMutation.mutate({
+      id: element.id,
+      updates: {
+        position: {
+          x: (element.position as any).x,
+          y: newY
+        }
+      }
+    });
+  };
+  
   // Set up mouse move and mouse up event listeners for dragging and resizing
   useEffect(() => {
     if (isDragging) {
@@ -537,13 +748,20 @@ const Canvas: React.FC<CanvasProps> = ({
       window.addEventListener('mouseup', handleResizeEnd);
     }
     
+    if (isPanning) {
+      window.addEventListener('mousemove', handlePan);
+      window.addEventListener('mouseup', handlePanEnd);
+    }
+    
     return () => {
       window.removeEventListener('mousemove', handleDrag);
       window.removeEventListener('mouseup', handleDragEnd);
       window.removeEventListener('mousemove', handleResize);
       window.removeEventListener('mouseup', handleResizeEnd);
+      window.removeEventListener('mousemove', handlePan);
+      window.removeEventListener('mouseup', handlePanEnd);
     };
-  }, [isDragging, isResizing, handleDrag, handleDragEnd, handleResize, handleResizeEnd]);
+  }, [isDragging, isResizing, isPanning, handleDrag, handleDragEnd, handleResize, handleResizeEnd, handlePan, handlePanEnd]);
 
   // Handle canvas click (deselect)
   const handleCanvasClick = () => {
@@ -553,6 +771,113 @@ const Canvas: React.FC<CanvasProps> = ({
     const event = new CustomEvent('element-deselected');
     document.dispatchEvent(event);
   };
+  
+  // Add event listeners for keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Delete key to remove selected element
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElement) {
+        e.preventDefault();
+        handleDeleteElement();
+      }
+      
+      // Ctrl+Z for undo (would need proper undo/redo implementation)
+      if (e.key === 'z' && e.ctrlKey) {
+        e.preventDefault();
+        // Implement undo functionality
+      }
+      
+      // Ctrl+Y or Ctrl+Shift+Z for redo
+      if ((e.key === 'y' && e.ctrlKey) || (e.key === 'z' && e.ctrlKey && e.shiftKey)) {
+        e.preventDefault();
+        // Implement redo functionality
+      }
+      
+      // Arrow keys for nudging selected elements
+      if (selectedElement && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        
+        const element = templateElements?.find(el => el.id === selectedElement);
+        if (!element) return;
+        
+        const step = e.shiftKey ? 10 : 1;
+        let newX = (element.position as any).x;
+        let newY = (element.position as any).y;
+        
+        switch (e.key) {
+          case 'ArrowUp': newY -= step; break;
+          case 'ArrowDown': newY += step; break;
+          case 'ArrowLeft': newX -= step; break;
+          case 'ArrowRight': newX += step; break;
+        }
+        
+        updateElementMutation.mutate({
+          id: element.id,
+          updates: {
+            position: { x: newX, y: newY }
+          }
+        });
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedElement, templateElements, updateElementMutation]);
+
+  // Listen for document resize to adjust zoom
+  useEffect(() => {
+    const handleResize = () => {
+      if (canvasRef.current && templateId) {
+        handleZoomFit();
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [templateId]);
+
+  // Add event listeners for component control from parent components
+  useEffect(() => {
+    const handleAddElement = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const elementType = customEvent.detail.type;
+      
+      // The logic to add specific element types is in Canvas.tsx
+      // So we trigger the appropriate method there
+      switch (elementType) {
+        case 'text':
+          document.dispatchEvent(new CustomEvent('add-text-element'));
+          break;
+        case 'image':
+          document.dispatchEvent(new CustomEvent('add-image-element'));
+          break;
+        case 'barcode':
+          document.dispatchEvent(new CustomEvent('add-barcode-element'));
+          break;
+        case 'shape':
+          document.dispatchEvent(new CustomEvent('add-shape-element'));
+          break;
+      }
+    };
+
+    document.addEventListener('add-element', handleAddElement);
+    document.addEventListener('add-text-element', handleAddTextElement);
+    document.addEventListener('add-image-element', handleAddImageElement);
+    document.addEventListener('add-barcode-element', handleAddBarcodeElement);
+    
+    return () => {
+      document.removeEventListener('add-element', handleAddElement);
+      document.removeEventListener('add-text-element', handleAddTextElement);
+      document.removeEventListener('add-image-element', handleAddImageElement);
+      document.removeEventListener('add-barcode-element', handleAddBarcodeElement);
+    };
+  }, []);
   
   // Render resize handles for selected element
   const renderResizeHandles = (elementId: string) => {
@@ -613,6 +938,189 @@ const Canvas: React.FC<CanvasProps> = ({
         />
       );
     });
+  };
+
+  // Render horizontal ruler
+  const renderHorizontalRuler = () => {
+    if (!showRulers) return null;
+    
+    const rulerHeight = 20;
+    const scaledWidth = width * (zoomLevel / 100);
+    const majorTick = 10; // Pixels between major ticks at 100% zoom
+    const minorTick = 5; // Pixels between minor ticks at 100% zoom
+    const numTicks = Math.floor(width / minorTick);
+    
+    return (
+      <div 
+        className="absolute left-0 top-0 bg-gray-100 border-b border-r border-gray-300"
+        style={{
+          height: `${rulerHeight}px`,
+          width: `${scaledWidth}px`,
+          overflow: 'hidden',
+          zIndex: 10
+        }}
+      >
+        {Array.from({ length: numTicks }).map((_, i) => {
+          const isMajor = i % (majorTick / minorTick) === 0;
+          const tickHeight = isMajor ? 10 : 5;
+          const tickPosition = i * minorTick * (zoomLevel / 100);
+          
+          return (
+            <div
+              key={`h-tick-${i}`}
+              className="absolute top-0 border-l border-gray-400"
+              style={{
+                height: `${tickHeight}px`,
+                left: `${tickPosition}px`,
+              }}
+            >
+              {isMajor && (
+                <div 
+                  className="text-xs text-gray-600 absolute"
+                  style={{
+                    left: '2px',
+                    top: '10px',
+                    fontSize: '8px'
+                  }}
+                >
+                  {i * minorTick}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+  
+  // Render vertical ruler
+  const renderVerticalRuler = () => {
+    if (!showRulers) return null;
+    
+    const rulerWidth = 20;
+    const scaledHeight = height * (zoomLevel / 100);
+    const majorTick = 10; // Pixels between major ticks at 100% zoom
+    const minorTick = 5; // Pixels between minor ticks at 100% zoom
+    const numTicks = Math.floor(height / minorTick);
+    
+    return (
+      <div 
+        className="absolute left-0 top-0 bg-gray-100 border-r border-b border-gray-300"
+        style={{
+          width: `${rulerWidth}px`,
+          height: `${scaledHeight}px`,
+          zIndex: 10
+        }}
+      >
+        {Array.from({ length: numTicks }).map((_, i) => {
+          const isMajor = i % (majorTick / minorTick) === 0;
+          const tickWidth = isMajor ? 10 : 5;
+          const tickPosition = i * minorTick * (zoomLevel / 100);
+          
+          return (
+            <div
+              key={`v-tick-${i}`}
+              className="absolute left-0 border-t border-gray-400"
+              style={{
+                width: `${tickWidth}px`,
+                top: `${tickPosition}px`,
+              }}
+            >
+              {isMajor && (
+                <div 
+                  className="text-xs text-gray-600 absolute"
+                  style={{
+                    left: '2px',
+                    top: '0px',
+                    fontSize: '8px'
+                  }}
+                >
+                  {i * minorTick}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Draw Paper boundaries
+  const renderPaperBoundaries = () => {
+    const paperWidth = width;
+    const paperHeight = height;
+    const templateWidth = template?.width || width;
+    const templateHeight = template?.height || height;
+    
+    // Calculate paper and template boundaries
+    const paperTop = 0;
+    const paperLeft = 0;
+    
+    // Yellow background for paper
+    return (
+      <>
+        <div 
+          className="absolute bg-yellow-50"
+          style={{
+            left: `${paperLeft}px`,
+            top: `${paperTop}px`,
+            width: `${paperWidth}px`,
+            height: `${paperHeight}px`,
+          }}
+        />
+        
+        {/* Label boundaries */}
+        {template?.grid_settings?.columns && template?.grid_settings?.rows && (
+          <>
+            {Array.from({ length: template.grid_settings.columns * template.grid_settings.rows }).map((_, i) => {
+              const col = i % template.grid_settings.columns;
+              const row = Math.floor(i / template.grid_settings.columns);
+              
+              // Calculate label position
+              const gridWidth = paperWidth / template.grid_settings.columns;
+              const gridHeight = paperHeight / template.grid_settings.rows;
+              
+              // Apply gaps
+              const gapH = template.grid_settings.horizontalGap || 0;
+              const gapV = template.grid_settings.verticalGap || 0;
+              
+              const labelWidth = gridWidth - gapH;
+              const labelHeight = gridHeight - gapV;
+              
+              const labelLeft = paperLeft + (col * gridWidth) + (gapH / 2);
+              const labelTop = paperTop + (row * gridHeight) + (gapV / 2);
+              
+              return (
+                <div 
+                  key={`label-${i}`}
+                  className="absolute bg-white border border-gray-200"
+                  style={{
+                    left: `${labelLeft}px`,
+                    top: `${labelTop}px`,
+                    width: `${labelWidth}px`,
+                    height: `${labelHeight}px`,
+                    borderRadius: template.grid_settings.cornerRadius || 0,
+                  }}
+                />
+              );
+            })}
+          </>
+        )}
+        
+        {/* Safety margin indicator (red line) */}
+        {showMargins && (
+          <div 
+            className="absolute border border-red-500 pointer-events-none"
+            style={{
+              left: `${paperLeft + 5}px`,
+              top: `${paperTop + 5}px`,
+              width: `${paperWidth - 10}px`,
+              height: `${paperHeight - 10}px`,
+            }}
+          />
+        )}
+      </>
+    );
   };
 
   // Render elements
@@ -715,62 +1223,148 @@ const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
+  // Draw gridlines
+  const renderGrid = () => {
+    if (!showGrid) return null;
+    
+    const gridSize = 10; // pixels between grid lines at 100% zoom
+    const scaledWidth = width * (zoomLevel / 100);
+    const scaledHeight = height * (zoomLevel / 100);
+    
+    const horizontalLines = Math.floor(height / gridSize);
+    const verticalLines = Math.floor(width / gridSize);
+    
+    return (
+      <>
+        {/* Horizontal grid lines */}
+        {Array.from({ length: horizontalLines }).map((_, i) => (
+          <div
+            key={`h-grid-${i}`}
+            className="absolute left-0 border-t border-gray-200"
+            style={{
+              width: `${scaledWidth}px`,
+              top: `${i * gridSize * (zoomLevel / 100)}px`,
+            }}
+          />
+        ))}
+        
+        {/* Vertical grid lines */}
+        {Array.from({ length: verticalLines }).map((_, i) => (
+          <div
+            key={`v-grid-${i}`}
+            className="absolute top-0 border-l border-gray-200"
+            style={{
+              height: `${scaledHeight}px`,
+              left: `${i * gridSize * (zoomLevel / 100)}px`,
+            }}
+          />
+        ))}
+      </>
+    );
+  };
+
   return (
-    <div className="relative overflow-auto h-full flex flex-col items-center justify-center bg-designer-canvas p-8">
-      <div className="flex flex-col">
-        <div className="mb-4 flex space-x-2">
-          <Button onClick={handleAddTextElement} variant="outline" className="flex items-center gap-1">
-            <Text className="h-4 w-4" />
-            Add Text
-          </Button>
-          <Button onClick={handleAddImageElement} variant="outline" className="flex items-center gap-1">
-            <Image className="h-4 w-4" />
-            Add Image
-          </Button>
-          <Button onClick={handleAddBarcodeElement} variant="outline" className="flex items-center gap-1">
-            <SquarePlus className="h-4 w-4" />
-            Add Barcode
-          </Button>
-          
-          {selectedElement && selectedElementData?.type === 'text' && (
-            <Button onClick={handleEditText} variant="outline" className="flex items-center gap-1">
+    <div className="relative overflow-auto h-full flex flex-col items-center justify-center bg-designer-canvas p-4">
+      <div className="flex flex-col mb-4 w-full">
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex space-x-2">
+            <Button onClick={handleAddTextElement} variant="outline" className="flex items-center gap-1">
               <Text className="h-4 w-4" />
-              Edit Text
+              Add Text
             </Button>
-          )}
+            <Button onClick={handleAddImageElement} variant="outline" className="flex items-center gap-1">
+              <Image className="h-4 w-4" />
+              Add Image
+            </Button>
+            <Button onClick={handleAddBarcodeElement} variant="outline" className="flex items-center gap-1">
+              <SquarePlus className="h-4 w-4" />
+              Add Barcode
+            </Button>
+            
+            {selectedElement && selectedElementData?.type === 'text' && (
+              <Button onClick={handleEditText} variant="outline" className="flex items-center gap-1">
+                <Text className="h-4 w-4" />
+                Edit Text
+              </Button>
+            )}
+            
+            {selectedElement && (
+              <Button onClick={handleDeleteElement} variant="outline" className="flex items-center gap-1 text-red-500">
+                <Trash className="h-4 w-4" />
+                Delete
+              </Button>
+            )}
+          </div>
           
-          {selectedElement && (
-            <Button onClick={handleDeleteElement} variant="outline" className="flex items-center gap-1 text-red-500">
-              <Trash className="h-4 w-4" />
-              Delete
-            </Button>
-          )}
+          <ZoomControls 
+            zoomLevel={zoomLevel}
+            onZoomChange={setZoomLevel}
+            onZoomFit={handleZoomFit}
+            onZoomObjects={handleZoomObjects}
+          />
         </div>
+        
+        <VisualAidTools
+          showGrid={showGrid}
+          showRulers={showRulers}
+          showSnaplines={showSnaplines}
+          showMargins={showMargins}
+          onToggleGrid={() => setShowGrid(!showGrid)}
+          onToggleRulers={() => setShowRulers(!showRulers)}
+          onToggleSnaplines={() => setShowSnaplines(!showSnaplines)}
+          onToggleMargins={() => setShowMargins(!showMargins)}
+          onAlignHorizontal={handleAlignHorizontal}
+          onAlignVertical={handleAlignVertical}
+        />
+      </div>
+      
+      <div 
+        ref={canvasRef}
+        className="relative overflow-hidden border border-gray-300 bg-gray-200"
+        style={{
+          width: 'calc(100% - 20px)',
+          height: 'calc(100% - 120px)',
+        }}
+        onClick={handleCanvasClick}
+        onMouseDown={handlePanStart}
+        onWheel={handleWheel}
+      >
         <div
           className={cn(
-            "designer-canvas relative border border-gray-300 bg-white",
+            "absolute",
             { "canvas-grid": showGrid }
           )}
           style={{
+            transform: `translate(${canvasPan.x}px, ${canvasPan.y}px) scale(${zoomLevel / 100})`,
+            transformOrigin: '0 0',
             width: `${width}px`,
             height: `${height}px`,
+            transition: 'transform 0.1s ease-in-out',
           }}
-          onClick={handleCanvasClick}
         >
+          {renderPaperBoundaries()}
+          {renderGrid()}
           {renderElements()}
-          
-          {(!templateElements || templateElements.length === 0) && (
-            <div className="absolute inset-0 p-4 text-center flex items-center justify-center text-gray-400">
-              <p>Select a template and add elements using the buttons above to start designing</p>
-            </div>
-          )}
-          
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/50">
-              <p>Loading elements...</p>
-            </div>
-          )}
         </div>
+        
+        {renderHorizontalRuler()}
+        {renderVerticalRuler()}
+        
+        {/* Show zoom indicator */}
+        <div className="absolute bottom-2 right-2 bg-white/80 px-2 py-1 rounded text-xs">
+          {zoomLevel}%
+        </div>
+        
+        {/* Info on how to navigate */}
+        <div className="absolute bottom-2 left-2 bg-white/80 px-2 py-1 rounded text-xs max-w-xs">
+          💡 Tip: Use Ctrl+Scroll to zoom, Alt+Drag to pan
+        </div>
+        
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/50">
+            <p>Loading elements...</p>
+          </div>
+        )}
       </div>
       
       {/* Text Editor Dialog */}
