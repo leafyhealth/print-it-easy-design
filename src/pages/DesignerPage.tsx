@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
@@ -31,13 +32,23 @@ const DesignerPage = () => {
       
       // Setup storage bucket
       if (user) {
-        const bucketSetup = await ensureStorageBucketExists();
-        if (bucketSetup) {
-          console.log('Storage bucket is ready for use');
-        } else {
+        // Force bucket creation on every page load to ensure it exists
+        try {
+          const bucketSetup = await ensureStorageBucketExists();
+          if (bucketSetup) {
+            console.log('Storage bucket is ready for use');
+          } else {
+            toast({
+              title: 'Storage Setup Issue',
+              description: 'There was a problem setting up storage. Some features may not work properly.',
+              variant: 'destructive'
+            });
+          }
+        } catch (error) {
+          console.error('Error setting up storage bucket:', error);
           toast({
-            title: 'Storage Setup Issue',
-            description: 'There was a problem setting up storage. Some features may not work properly.',
+            title: 'Storage Setup Error',
+            description: 'Failed to set up the storage bucket. Please try again later.',
             variant: 'destructive'
           });
         }

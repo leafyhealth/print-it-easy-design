@@ -27,11 +27,9 @@ export async function setupStorageBucket() {
         } else {
           console.log('Created template_assets bucket successfully');
           
-          // Set public policy for the bucket
-          const { error: policyError } = await supabase.storage.from('template_assets').getPublicUrl('test.txt');
-          if (policyError) {
-            console.error('Error setting public policy:', policyError);
-          }
+          // Get public URL for the bucket to test it (not checking for error here)
+          const { data } = await supabase.storage.from('template_assets').getPublicUrl('test.txt');
+          console.log('Public URL test:', data.publicUrl);
         }
       } catch (error) {
         console.error('Error in setupStorageBucket:', error);

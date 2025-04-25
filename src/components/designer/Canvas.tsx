@@ -37,7 +37,7 @@ interface CanvasProps {
 const Canvas: React.FC<CanvasProps> = ({
   width = 600,
   height = 400,
-  showGrid = true,
+  showGrid: initialShowGrid = true,
   templateId,
 }) => {
   const queryClient = useQueryClient();
@@ -62,6 +62,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const [showRulers, setShowRulers] = useState(true);
   const [showSnaplines, setShowSnaplines] = useState(true);
   const [showMargins, setShowMargins] = useState(true);
+  const [showGridState, setShowGridState] = useState(initialShowGrid);
   const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStartPos, setPanStartPos] = useState({ x: 0, y: 0 });
@@ -1241,7 +1242,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // Draw gridlines
   const renderGrid = () => {
-    if (!showGrid) return null;
+    if (!showGridState) return null;
     
     const gridSize = 10; // pixels between grid lines at 100% zoom
     const scaledWidth = width * (zoomLevel / 100);
@@ -1321,11 +1322,11 @@ const Canvas: React.FC<CanvasProps> = ({
         </div>
         
         <VisualAidTools
-          showGrid={showGrid}
+          showGrid={showGridState}
           showRulers={showRulers}
           showSnaplines={showSnaplines}
           showMargins={showMargins}
-          onToggleGrid={() => setShowGrid(!showGrid)}
+          onToggleGrid={() => setShowGridState(!showGridState)}
           onToggleRulers={() => setShowRulers(!showRulers)}
           onToggleSnaplines={() => setShowSnaplines(!showSnaplines)}
           onToggleMargins={() => setShowMargins(!showMargins)}
@@ -1348,7 +1349,7 @@ const Canvas: React.FC<CanvasProps> = ({
         <div
           className={cn(
             "absolute",
-            { "canvas-grid": showGrid }
+            { "canvas-grid": showGridState }
           )}
           style={{
             transform: `translate(${canvasPan.x}px, ${canvasPan.y}px) scale(${zoomLevel / 100})`,

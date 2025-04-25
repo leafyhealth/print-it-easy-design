@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog,
@@ -40,6 +39,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     const setupBucket = async () => {
       if (open) {
         try {
+          // Force bucket creation every time the uploader opens to ensure it exists
           const success = await ensureStorageBucketExists();
           setBucketReady(success);
           
@@ -128,7 +128,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     
     try {
       console.log("Starting file upload...");
-      // Ensure bucket exists one more time before upload
+      // Force bucket creation once more right before upload
       await ensureStorageBucketExists();
       
       // Create filename
