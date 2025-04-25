@@ -12,6 +12,21 @@ import BarcodeEditor from './BarcodeEditor';
 import ZoomControls from './ZoomControls';
 import VisualAidTools from './VisualAidTools';
 
+interface GridSettings {
+  showGrid?: boolean;
+  gridSize?: number;
+  paperFormat?: string;
+  paperWidth?: number;
+  paperHeight?: number;
+  unit?: string;
+  labelLayout?: string;
+  columns?: number;
+  rows?: number;
+  horizontalGap?: number;
+  verticalGap?: number;
+  cornerRadius?: number;
+}
+
 interface CanvasProps {
   width?: number;
   height?: number;
@@ -1041,7 +1056,7 @@ const Canvas: React.FC<CanvasProps> = ({
     );
   };
 
-  // Draw Paper boundaries
+  // Render Paper boundaries
   const renderPaperBoundaries = () => {
     const paperWidth = width;
     const paperHeight = height;
@@ -1051,6 +1066,11 @@ const Canvas: React.FC<CanvasProps> = ({
     // Calculate paper and template boundaries
     const paperTop = 0;
     const paperLeft = 0;
+    
+    // Extract grid settings safely
+    const gridSettings: GridSettings = template?.grid_settings && typeof template.grid_settings === 'object' 
+      ? template.grid_settings as unknown as GridSettings 
+      : { showGrid: true, gridSize: 10 };
     
     // Yellow background for paper
     return (
@@ -1066,19 +1086,19 @@ const Canvas: React.FC<CanvasProps> = ({
         />
         
         {/* Label boundaries */}
-        {template?.grid_settings?.columns && template?.grid_settings?.rows && (
+        {gridSettings.columns && gridSettings.rows && (
           <>
-            {Array.from({ length: template.grid_settings.columns * template.grid_settings.rows }).map((_, i) => {
-              const col = i % template.grid_settings.columns;
-              const row = Math.floor(i / template.grid_settings.columns);
+            {Array.from({ length: gridSettings.columns * gridSettings.rows }).map((_, i) => {
+              const col = i % gridSettings.columns;
+              const row = Math.floor(i / gridSettings.columns);
               
               // Calculate label position
-              const gridWidth = paperWidth / template.grid_settings.columns;
-              const gridHeight = paperHeight / template.grid_settings.rows;
+              const gridWidth = paperWidth / gridSettings.columns;
+              const gridHeight = paperHeight / gridSettings.rows;
               
               // Apply gaps
-              const gapH = template.grid_settings.horizontalGap || 0;
-              const gapV = template.grid_settings.verticalGap || 0;
+              const gapH = gridSettings.horizontalGap || 0;
+              const gapV = gridSettings.verticalGap || 0;
               
               const labelWidth = gridWidth - gapH;
               const labelHeight = gridHeight - gapV;
@@ -1095,7 +1115,7 @@ const Canvas: React.FC<CanvasProps> = ({
                     top: `${labelTop}px`,
                     width: `${labelWidth}px`,
                     height: `${labelHeight}px`,
-                    borderRadius: template.grid_settings.cornerRadius || 0,
+                    borderRadius: gridSettings.cornerRadius || 0,
                   }}
                 />
               );

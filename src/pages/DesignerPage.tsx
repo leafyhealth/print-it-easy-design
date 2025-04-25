@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
@@ -10,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { setupStorageBucket } from '@/lib/setupStorage';
+import { ensureStorageBucketExists } from '@/lib/setupStorage';
 
 const DesignerPage = () => {
   const queryClient = useQueryClient();
@@ -32,7 +31,16 @@ const DesignerPage = () => {
       
       // Setup storage bucket
       if (user) {
-        await setupStorageBucket();
+        const bucketSetup = await ensureStorageBucketExists();
+        if (bucketSetup) {
+          console.log('Storage bucket is ready for use');
+        } else {
+          toast({
+            title: 'Storage Setup Issue',
+            description: 'There was a problem setting up storage. Some features may not work properly.',
+            variant: 'destructive'
+          });
+        }
       }
     };
 
@@ -43,7 +51,7 @@ const DesignerPage = () => {
       async (event, session) => {
         setUser(session?.user || null);
         if (session?.user) {
-          await setupStorageBucket();
+          await ensureStorageBucketExists();
         }
       }
     );
@@ -51,7 +59,7 @@ const DesignerPage = () => {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [selectedTemplateId]);
 
   // Fetch templates
   const { data: templates, isLoading } = useQuery({
@@ -125,7 +133,10 @@ const DesignerPage = () => {
             unit: templateSettings.unit,
             labelLayout: templateSettings.labelLayout,
             columns: templateSettings.columns,
-            rows: templateSettings.rows
+            rows: templateSettings.rows,
+            horizontalGap: 0,  // Default gap values
+            verticalGap: 0,
+            cornerRadius: 0    // Default corner radius
           }
         })
         .select()

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Dialog,
   DialogContent, 
@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Upload, ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
-import { setupStorageBucket } from '@/lib/setupStorage';
+import { ensureStorageBucketExists } from '@/lib/setupStorage';
 
 interface ImageUploaderProps {
   open: boolean;
@@ -33,17 +33,31 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [recentImages, setRecentImages] = useState<string[]>([]);
+  const [bucketReady, setBucketReady] = useState(false);
 
-  // Load recent images when the dialog opens
-  React.useEffect(() => {
-    if (open && templateId) {
-      fetchRecentImages();
-    }
+  // Setup bucket and load recent images when the dialog opens
+  useEffect(() => {
+    const setupBucket = async () => {
+      if (open) {
+        try {
+          const success = await ensureStorageBucketExists();
+          setBucketReady(success);
+          
+          if (success && templateId) {
+            await fetchRecentImages();
+          }
+        } catch (error) {
+          console.error("Error setting up storage:", error);
+          toast({
+            title: "Storage Error",
+            description: "Could not set up storage for uploads",
+            variant: "destructive"
+          });
+        }
+      }
+    };
     
-    // Ensure the bucket exists when the component is opened
-    if (open) {
-      setupStorageBucket();
-    }
+    setupBucket();
   }, [open, templateId]);
 
   const fetchRecentImages = async () => {
@@ -99,18 +113,29 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
   
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !bucketReady) {
+      if (!bucketReady) {
+        toast({
+          title: "Storage not ready",
+          description: "The storage system is not ready. Please try again later.",
+          variant: "destructive"
+        });
+      }
+      return;
+    }
     
     setUploading(true);
     
     try {
-      // Ensure bucket exists
-      await setupStorageBucket();
+      console.log("Starting file upload...");
+      // Ensure bucket exists one more time before upload
+      await ensureStorageBucketExists();
       
       // Create filename
       const fileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
       const filePath = `images/${fileName}`;
       
+      console.log(`Uploading file to path: ${filePath}`);
       // Upload the file
       const { data, error } = await supabase.storage
         .from('template_assets')
@@ -124,11 +149,14 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         throw error;
       }
       
+      console.log("Upload successful, getting public URL");
       // Get the public URL
       const { data: publicUrlData } = supabase.storage
         .from('template_assets')
         .getPublicUrl(filePath);
         
+      console.log("Public URL:", publicUrlData.publicUrl);
+      
       // Call onImageSelect with the URL
       onImageSelect(publicUrlData.publicUrl);
       
