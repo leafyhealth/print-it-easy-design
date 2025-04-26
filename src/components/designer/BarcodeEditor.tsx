@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog,
@@ -89,7 +88,6 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
     if (initialProperties.qrStyle) setQrStyle(initialProperties.qrStyle);
     if (initialProperties.isUrl) setIsUrl(initialProperties.isUrl);
     
-    // If it's a QR code and we have a URL, set isUrl to true
     if (initialProperties.barcodeType === 'qrcode' && initialProperties.content && 
         (initialProperties.content.startsWith('http://') || initialProperties.content.startsWith('https://'))) {
       setIsUrl(true);
@@ -108,7 +106,6 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
   };
 
   const handleSave = () => {
-    // For QR codes, if isUrl is true, use the URL as content
     if (barcodeType === 'qrcode' && isUrl) {
       if (!url) {
         toast({
@@ -128,11 +125,10 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
         return;
       }
       
-      // Save with the URL as the content
       onSave({
         content: url,
         barcodeType,
-        showText: false, // QR codes don't show text
+        showText: false,
         width,
         height,
         foregroundColor,
@@ -141,7 +137,6 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
         isUrl: true
       });
     } else {
-      // Regular barcode or QR code with plain text
       onSave({
         content,
         barcodeType,

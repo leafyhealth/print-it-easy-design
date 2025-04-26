@@ -5,9 +5,7 @@ import {
   ZoomIn, 
   ZoomOut, 
   Maximize, 
-  Square,
-  Circle,
-  Barcode 
+  Square
 } from 'lucide-react';
 import { 
   Select, 
@@ -23,6 +21,10 @@ interface ZoomControlsProps {
   onZoomChange: (level: number) => void;
   onZoomFit: () => void;
   onZoomObjects: () => void;
+  // Adding these props to match usage in Canvas.tsx
+  onZoomIn?: () => void; 
+  onZoomOut?: () => void;
+  onZoomReset?: () => void;
 }
 
 const ZOOM_PRESETS = [10, 25, 50, 75, 100, 125, 150, 200, 300, 400, 500];
@@ -31,9 +33,17 @@ const ZoomControls: React.FC<ZoomControlsProps> = ({
   zoomLevel,
   onZoomChange,
   onZoomFit,
-  onZoomObjects
+  onZoomObjects,
+  onZoomIn: customZoomIn,
+  onZoomOut: customZoomOut,
+  onZoomReset
 }) => {
   const handleZoomIn = () => {
+    if (customZoomIn) {
+      customZoomIn();
+      return;
+    }
+    
     const currentIndex = ZOOM_PRESETS.findIndex(zoom => zoom >= zoomLevel);
     if (currentIndex < ZOOM_PRESETS.length - 1) {
       onZoomChange(ZOOM_PRESETS[currentIndex + 1]);
@@ -41,6 +51,11 @@ const ZoomControls: React.FC<ZoomControlsProps> = ({
   };
 
   const handleZoomOut = () => {
+    if (customZoomOut) {
+      customZoomOut();
+      return;
+    }
+    
     const currentIndex = ZOOM_PRESETS.findIndex(zoom => zoom > zoomLevel) - 1;
     if (currentIndex >= 0) {
       onZoomChange(ZOOM_PRESETS[currentIndex]);
@@ -134,6 +149,25 @@ const ZoomControls: React.FC<ZoomControlsProps> = ({
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
+
+      {onZoomReset && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={onZoomReset}
+              >
+                <span className="text-xs">100%</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Reset Zoom</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog,
@@ -131,7 +130,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       toast({
         title: "No file selected",
         description: "Please select an image to upload",
-        variant: "warning"
+        variant: "destructive"
       });
       return;
     }
@@ -219,7 +218,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         toast({
           title: "Invalid image URL",
           description: "Please enter a URL that points to an image file",
-          variant: "warning"
+          variant: "destructive"
         });
         return;
       }
@@ -242,7 +241,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       toast({
         title: "URL required",
         description: "Please enter an image URL",
-        variant: "warning"
+        variant: "destructive"
       });
     }
   };

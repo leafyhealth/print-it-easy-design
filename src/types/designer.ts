@@ -106,3 +106,12 @@ export interface PrintSettings {
   copies: number;
   dpi: number;
 }
+
+export interface TextEditorProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  textProperties: any;
+  onSave: (textProperties: any) => void;
+  content?: string; // Optional prop for backward compatibility
+}
+

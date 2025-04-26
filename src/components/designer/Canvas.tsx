@@ -1,22 +1,24 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { DesignElement, GridSettings } from '@/types/designer';
-import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
-import { Trash, Save, Image, Text, SquarePlus, Printer, ZoomIn, ZoomOut, Ruler, Grid3x3 } from 'lucide-react';
+
+// Import our new components
+import CanvasToolbar from './CanvasToolbar';
+import CanvasElement from './CanvasElement';
+import CanvasGrid from './CanvasGrid';
+import CanvasRulers from './CanvasRulers';
 import TextEditor from './TextEditor';
 import ImageUploader from './ImageUploader';
 import BarcodeEditor from './BarcodeEditor';
-import ZoomControls from './ZoomControls';
-import VisualAidTools from './VisualAidTools';
+import { GridSettings } from '@/types/designer';
 
 interface CanvasProps {
   width?: number;
   height?: number;
   showGrid?: boolean;
-  templateId?: string; // Optional template ID
+  templateId?: string;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -51,6 +53,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [panStartPos, setPanStartPos] = useState({ x: 0, y: 0 });
 
+  // Query to get template data
   const { data: template, isLoading: isTemplateLoading } = useQuery({
     queryKey: ['template', templateId],
     queryFn: async () => {
@@ -82,6 +85,7 @@ const Canvas: React.FC<CanvasProps> = ({
       : template.grid_settings as unknown as GridSettings) 
     : { showGrid: true, gridSize: 10 };
 
+  // Query to get template elements
   const { data: templateElements, isLoading } = useQuery({
     queryKey: ['template-elements', templateId],
     queryFn: async () => {
@@ -110,6 +114,7 @@ const Canvas: React.FC<CanvasProps> = ({
     (element) => element.id === selectedElement
   );
 
+  // Mutation to add a new element
   const addElementMutation = useMutation({
     mutationFn: async (newElement: {
       type: string;
@@ -160,6 +165,7 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   });
 
+  // Mutation to update an element
   const updateElementMutation = useMutation({
     mutationFn: async ({ 
       id, 
@@ -196,6 +202,7 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   });
 
+  // Mutation to delete an element
   const deleteElementMutation = useMutation({
     mutationFn: async (elementId: string) => {
       const { error } = await supabase
@@ -226,6 +233,7 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   });
 
+  // Element creation handlers
   const handleAddTextElement = () => {
     if (!templateId) {
       toast({
@@ -317,29 +325,6 @@ const Canvas: React.FC<CanvasProps> = ({
     addElementMutation.mutate(newBarcodeElement);
   };
 
-  const handleEditText = () => {
-    if (selectedElement && selectedElementData?.type === 'text') {
-      setShowTextEditor(true);
-    } else {
-      toast({
-        title: 'No text element selected',
-        description: 'Please select a text element to edit',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const handleSaveTextChanges = (textProperties: any) => {
-    if (selectedElement) {
-      updateElementMutation.mutate({
-        id: selectedElement,
-        updates: {
-          properties: textProperties
-        }
-      });
-    }
-  };
-
   const handleDeleteElement = () => {
     if (selectedElement) {
       deleteElementMutation.mutate(selectedElement);
@@ -352,6 +337,7 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
+  // Element interaction handlers
   const handleElementDoubleClick = (elementId: string, elementType: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedElement(elementId);
@@ -533,6 +519,7 @@ const Canvas: React.FC<CanvasProps> = ({
     setResizeStartData(null);
   }, [isResizing, selectedElement, templateElements, updateElementMutation]);
 
+  // Canvas navigation/interaction handlers
   const handlePanStart = (e: React.MouseEvent) => {
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       setIsPanning(true);
@@ -633,68 +620,25 @@ const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
-  const handleAlignHorizontal = (position: 'start' | 'center' | 'end') => {
-    if (!selectedElement || !templateElements) return;
+  const handleCanvasClick = () => {
+    setSelectedElement(null);
     
-    const element = templateElements.find(el => el.id === selectedElement);
-    if (!element) return;
-    
-    let newX = (element.position as any).x;
-    
-    switch (position) {
-      case 'start':
-        newX = 0;
-        break;
-      case 'center':
-        newX = (width - (element.size as any).width) / 2;
-        break;
-      case 'end':
-        newX = width - (element.size as any).width;
-        break;
-    }
-    
-    updateElementMutation.mutate({
-      id: element.id,
-      updates: {
-        position: {
-          x: newX,
-          y: (element.position as any).y
-        }
-      }
-    });
+    const event = new CustomEvent('element-deselected');
+    document.dispatchEvent(event);
   };
 
-  const handleAlignVertical = (position: 'start' | 'center' | 'end') => {
-    if (!selectedElement || !templateElements) return;
-    
-    const element = templateElements.find(el => el.id === selectedElement);
-    if (!element) return;
-    
-    let newY = (element.position as any).y;
-    
-    switch (position) {
-      case 'start':
-        newY = 0;
-        break;
-      case 'center':
-        newY = (height - (element.size as any).height) / 2;
-        break;
-      case 'end':
-        newY = height - (element.size as any).height;
-        break;
-    }
-    
-    updateElementMutation.mutate({
-      id: element.id,
-      updates: {
-        position: {
-          x: (element.position as any).x,
-          y: newY
+  const handleSaveTextChanges = (textProperties: any) => {
+    if (selectedElement) {
+      updateElementMutation.mutate({
+        id: selectedElement,
+        updates: {
+          properties: textProperties
         }
-      }
-    });
+      });
+    }
   };
 
+  // Event listeners
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleDrag);
@@ -721,13 +665,7 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [isDragging, isResizing, isPanning, handleDrag, handleDragEnd, handleResize, handleResizeEnd, handlePan, handlePanEnd]);
 
-  const handleCanvasClick = () => {
-    setSelectedElement(null);
-    
-    const event = new CustomEvent('element-deselected');
-    document.dispatchEvent(event);
-  };
-
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'z' && e.ctrlKey) {
@@ -771,6 +709,7 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [selectedElement, templateElements, updateElementMutation]);
 
+  // Window resize handler
   useEffect(() => {
     const handleResize = () => {
       if (canvasRef.current && templateId) {
@@ -785,6 +724,7 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [templateId]);
 
+  // Custom event listeners
   useEffect(() => {
     const handleAddElement = (event: Event) => {
       const customEvent = event as CustomEvent;
@@ -819,260 +759,24 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, []);
 
-  const renderResizeHandles = (elementId: string) => {
-    if (selectedElement !== elementId) return null;
-    
-    const directions = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
-    return directions.map(dir => {
-      const handleStyle: React.CSSProperties = {
-        position: 'absolute',
-        width: '8px',
-        height: '8px',
-        backgroundColor: 'white',
-        border: '1px solid #0284c7',
-        cursor: `${dir}-resize`
-      };
-      
-      switch (dir) {
-        case 'n': 
-          handleStyle.top = '-4px';
-          handleStyle.left = 'calc(50% - 4px)';
-          break;
-        case 'ne':
-          handleStyle.top = '-4px';
-          handleStyle.right = '-4px';
-          break;
-        case 'e':
-          handleStyle.top = 'calc(50% - 4px)';
-          handleStyle.right = '-4px';
-          break;
-        case 'se':
-          handleStyle.bottom = '-4px';
-          handleStyle.right = '-4px';
-          break;
-        case 's':
-          handleStyle.bottom = '-4px';
-          handleStyle.left = 'calc(50% - 4px)';
-          break;
-        case 'sw':
-          handleStyle.bottom = '-4px';
-          handleStyle.left = '-4px';
-          break;
-        case 'w':
-          handleStyle.top = 'calc(50% - 4px)';
-          handleStyle.left = '-4px';
-          break;
-        case 'nw':
-          handleStyle.top = '-4px';
-          handleStyle.left = '-4px';
-          break;
-      }
-      
-      return (
-        <div
-          key={`${elementId}-${dir}`}
-          style={handleStyle}
-          onMouseDown={(e) => handleResizeStart(e, elementId, dir)}
-        />
-      );
-    });
-  };
-
-  const renderHorizontalRuler = () => {
-    if (!showRulers) return null;
-    
-    const rulerHeight = 20;
-    const scaledWidth = width * (zoomLevel / 100);
-    const majorTick = 10;
-    const minorTick = 5;
-    const numTicks = Math.floor(width / minorTick);
-    
-    return (
-      <div 
-        className="absolute left-0 top-0 bg-gray-100 border-b border-r border-gray-300"
-        style={{
-          height: `${rulerHeight}px`,
-          width: `${scaledWidth}px`,
-          overflow: 'hidden',
-          zIndex: 10
-        }}
-      >
-        {Array.from({ length: numTicks }).map((_, i) => (
-          <div
-            key={`h-tick-${i}`}
-            className={cn(
-              "absolute top-0 h-full border-l border-gray-300",
-              i % 2 === 0 ? "h-1/2" : "h-1/4"
-            )}
-            style={{
-              left: `${(i * minorTick * (zoomLevel / 100))}px`,
-              borderLeftWidth: i % (majorTick / minorTick) === 0 ? '1px' : '0.5px'
-            }}
-          >
-            {i % (majorTick / minorTick) === 0 && (
-              <span 
-                className="absolute top-0 left-1 text-xs text-gray-600"
-                style={{ fontSize: '8px' }}
-              >
-                {i * minorTick}
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const renderVerticalRuler = () => {
-    if (!showRulers) return null;
-    
-    const rulerWidth = 20;
-    const scaledHeight = height * (zoomLevel / 100);
-    const majorTick = 10;
-    const minorTick = 5;
-    const numTicks = Math.floor(height / minorTick);
-    
-    return (
-      <div 
-        className="absolute left-0 top-0 bg-gray-100 border-r border-b border-gray-300"
-        style={{
-          width: `${rulerWidth}px`,
-          height: `${scaledHeight}px`,
-          overflow: 'hidden',
-          zIndex: 10
-        }}
-      >
-        {Array.from({ length: numTicks }).map((_, i) => (
-          <div
-            key={`v-tick-${i}`}
-            className={cn(
-              "absolute left-0 w-full border-t border-gray-300",
-              i % 2 === 0 ? "w-1/2" : "w-1/4"
-            )}
-            style={{
-              top: `${(i * minorTick * (zoomLevel / 100))}px`,
-              borderTopWidth: i % (majorTick / minorTick) === 0 ? '1px' : '0.5px'
-            }}
-          >
-            {i % (majorTick / minorTick) === 0 && (
-              <span 
-                className="absolute top-0 left-1 text-xs text-gray-600"
-                style={{ fontSize: '8px' }}
-              >
-                {i * minorTick}
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const renderGrid = () => {
-    if (!showGridState) return null;
-    
-    const gridSize = (gridSettings?.gridSize || 10) * (zoomLevel / 100);
-    const numHorizontalLines = Math.floor(height / (gridSettings?.gridSize || 10));
-    const numVerticalLines = Math.floor(width / (gridSettings?.gridSize || 10));
-    
-    return (
-      <>
-        {Array.from({ length: numHorizontalLines + 1 }).map((_, i) => (
-          <div
-            key={`h-grid-${i}`}
-            className="absolute left-0 w-full border-t border-gray-200"
-            style={{
-              top: `${i * gridSize}px`,
-              borderTopWidth: '0.5px'
-            }}
-          />
-        ))}
-        
-        {Array.from({ length: numVerticalLines + 1 }).map((_, i) => (
-          <div
-            key={`v-grid-${i}`}
-            className="absolute top-0 h-full border-l border-gray-200"
-            style={{
-              left: `${i * gridSize}px`,
-              borderLeftWidth: '0.5px'
-            }}
-          />
-        ))}
-      </>
-    );
-  };
-
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between p-2 border-b bg-gray-50">
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => handleAddTextElement()}
-            title="Add Text"
-          >
-            <Text size={16} />
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => handleAddImageElement()}
-            title="Add Image"
-          >
-            <Image size={16} />
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => handleAddBarcodeElement()}
-            title="Add Barcode or QR Code"
-          >
-            <SquarePlus size={16} />
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleDeleteElement}
-            title="Delete Selected Element"
-            disabled={!selectedElement}
-          >
-            <Trash size={16} />
-          </Button>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setShowRulers(!showRulers)}
-            className={showRulers ? 'bg-blue-100' : ''}
-            title="Toggle Rulers"
-          >
-            <Ruler size={16} />
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setShowGridState(!showGridState)}
-            className={showGridState ? 'bg-blue-100' : ''}
-            title="Toggle Grid"
-          >
-            <Grid3x3 size={16} />
-          </Button>
-          
-          <ZoomControls 
-            zoomLevel={zoomLevel}
-            onZoomIn={() => setZoomLevel(Math.min(500, zoomLevel + 10))}
-            onZoomOut={() => setZoomLevel(Math.max(25, zoomLevel - 10))}
-            onZoomReset={() => setZoomLevel(100)}
-          />
-        </div>
-      </div>
+      <CanvasToolbar
+        onAddText={handleAddTextElement}
+        onAddImage={handleAddImageElement}
+        onAddBarcode={handleAddBarcodeElement}
+        onDeleteElement={handleDeleteElement}
+        hasSelectedElement={!!selectedElement}
+        showRulers={showRulers}
+        onToggleRulers={() => setShowRulers(!showRulers)}
+        showGrid={showGridState}
+        onToggleGrid={() => setShowGridState(!showGridState)}
+        zoomLevel={zoomLevel}
+        onZoomIn={() => setZoomLevel(Math.min(500, zoomLevel + 10))}
+        onZoomOut={() => setZoomLevel(Math.max(25, zoomLevel - 10))}
+        onZoomFit={handleZoomFit}
+        onZoomObjects={handleZoomObjects}
+      />
       
       <div 
         className="relative flex-1 overflow-auto bg-gray-300"
@@ -1090,107 +794,33 @@ const Canvas: React.FC<CanvasProps> = ({
             overflow: 'hidden'
           }}
         >
-          {renderGrid()}
+          <CanvasGrid
+            showGrid={showGridState}
+            width={width}
+            height={height}
+            zoomLevel={zoomLevel}
+            gridSize={gridSettings?.gridSize || 10}
+          />
           
-          {renderHorizontalRuler()}
-          {renderVerticalRuler()}
+          <CanvasRulers
+            showRulers={showRulers}
+            width={width}
+            height={height}
+            zoomLevel={zoomLevel}
+          />
           
-          {!isLoading && templateElements && templateElements.map(element => {
-            const elementPosition = element.position as any;
-            const elementSize = element.size as any;
-            const elementProperties = element.properties as any;
-            
-            const elementStyle: React.CSSProperties = {
-              position: 'absolute',
-              left: `${elementPosition.x * (zoomLevel / 100)}px`,
-              top: `${elementPosition.y * (zoomLevel / 100)}px`,
-              width: `${elementSize.width * (zoomLevel / 100)}px`,
-              height: `${elementSize.height * (zoomLevel / 100)}px`,
-              transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
-              cursor: 'move',
-              zIndex: element.layer || 0,
-              border: selectedElement === element.id ? '1px solid #0284c7' : 'none'
-            };
-            
-            return (
-              <div
-                key={element.id}
-                style={elementStyle}
-                onClick={(e) => handleElementClick(element.id, e)}
-                onMouseDown={(e) => handleDragStart(e, element.id)}
-                onDoubleClick={(e) => handleElementDoubleClick(element.id, element.type, e)}
-                className={cn(
-                  "select-none overflow-hidden",
-                  selectedElement === element.id ? 'ring-2 ring-blue-500 ring-opacity-50' : ''
-                )}
-              >
-                {element.type === 'text' && (
-                  <div 
-                    style={{
-                      fontFamily: elementProperties.fontFamily,
-                      fontSize: `${elementProperties.fontSize * (zoomLevel / 100)}px`,
-                      fontWeight: elementProperties.fontWeight,
-                      fontStyle: elementProperties.fontStyle,
-                      textAlign: elementProperties.textAlign,
-                      textDecoration: elementProperties.textDecoration,
-                      color: elementProperties.color,
-                      width: '100%',
-                      height: '100%',
-                      padding: '4px',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {elementProperties.content}
-                  </div>
-                )}
-                
-                {element.type === 'image' && (
-                  <img
-                    src={elementProperties.src}
-                    alt={element.name}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: elementProperties.objectFit || 'contain'
-                    }}
-                  />
-                )}
-                
-                {element.type === 'barcode' && (
-                  <div className="w-full h-full flex items-center justify-center">
-                    {elementProperties.barcodeType === 'qrcode' ? (
-                      <div 
-                        className="qrcode-placeholder bg-black/90"
-                        style={{width: '90%', height: '90%'}}
-                        title={elementProperties.content}
-                      >
-                        <div className="w-full h-full relative">
-                          <div className="absolute inset-3 border-4 border-white flex items-center justify-center">
-                            <div className="bg-white w-1/3 h-1/3 flex items-center justify-center text-[6px] text-black">
-                              QR
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div 
-                        className="barcode-placeholder bg-gradient-to-r from-black via-white to-black"
-                        style={{width: '100%', height: '50%'}}
-                        title={elementProperties.content}
-                      />
-                    )}
-                    {elementProperties.showText && (
-                      <div className="absolute bottom-0 text-center w-full text-xs">
-                        {elementProperties.content}
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {renderResizeHandles(element.id)}
-              </div>
-            );
-          })}
+          {!isLoading && templateElements && templateElements.map(element => (
+            <CanvasElement
+              key={element.id}
+              element={element}
+              zoomLevel={zoomLevel}
+              isSelected={selectedElement === element.id}
+              onElementClick={handleElementClick}
+              onElementDoubleClick={handleElementDoubleClick}
+              onDragStart={handleDragStart}
+              onResizeStart={handleResizeStart}
+            />
+          ))}
         </div>
       </div>
       
@@ -1198,7 +828,6 @@ const Canvas: React.FC<CanvasProps> = ({
         <TextEditor
           open={showTextEditor}
           onOpenChange={setShowTextEditor}
-          initialText={(selectedElementData.properties as any)?.content || ''}
           textProperties={(selectedElementData.properties as any) || {}}
           onSave={handleSaveTextChanges}
         />
@@ -1217,8 +846,8 @@ const Canvas: React.FC<CanvasProps> = ({
         <BarcodeEditor
           open={showBarcodeEditor}
           onOpenChange={setShowBarcodeEditor}
-          initialValue=""
           onSave={handleBarcodeConfigured}
+          initialProperties={{}}
         />
       )}
       
