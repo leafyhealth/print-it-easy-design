@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog,
@@ -19,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from '@/components/ui/use-toast';
 
 interface BarcodeEditorProps {
   open: boolean;
@@ -32,6 +32,7 @@ interface BarcodeEditorProps {
     foregroundColor: string;
     backgroundColor: string;
     url?: string;
+    qrStyle?: string;
   }) => void;
   initialProperties?: {
     content?: string;
@@ -46,10 +47,10 @@ interface BarcodeEditorProps {
 }
 
 const BARCODE_TYPES = [
+  { id: 'qrcode', label: 'QR Code' },
   { id: 'code128', label: 'Code 128' },
   { id: 'code39', label: 'Code 39' },
   { id: 'ean13', label: 'EAN-13' },
-  { id: 'qrcode', label: 'QR Code' },
   { id: 'datamatrix', label: 'Data Matrix' }
 ];
 
@@ -61,15 +62,16 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
 }) => {
   const [content, setContent] = useState(initialProperties.content || '123456789');
   const [barcodeType, setBarcodeType] = useState(initialProperties.barcodeType || 'code128');
-  const [showText, setShowText] = useState(initialProperties.showText !== false); // Default to true
+  const [showText, setShowText] = useState(initialProperties.showText !== false);
   const [width, setWidth] = useState(initialProperties.width || 150);
   const [height, setHeight] = useState(initialProperties.height || 80);
   const [foregroundColor, setForegroundColor] = useState(initialProperties.foregroundColor || '#000000');
   const [backgroundColor, setBackgroundColor] = useState(initialProperties.backgroundColor || '#FFFFFF');
   const [url, setUrl] = useState(initialProperties.url || '');
   const [activeTab, setActiveTab] = useState('content');
+  const [qrStyle, setQrStyle] = useState('classic');
+  const [urlInput, setUrlInput] = useState(initialProperties.url || '');
 
-  // Update state when initialProperties change
   useEffect(() => {
     if (initialProperties.content) setContent(initialProperties.content);
     if (initialProperties.barcodeType) setBarcodeType(initialProperties.barcodeType);
@@ -81,16 +83,36 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
     if (initialProperties.url) setUrl(initialProperties.url);
   }, [initialProperties]);
 
+  const validateUrl = (url: string) => {
+    if (!url) return true;
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const handleSave = () => {
+    if (barcodeType === 'qrcode' && urlInput && !validateUrl(urlInput)) {
+      toast({
+        title: 'Invalid URL',
+        description: 'Please enter a valid URL starting with http:// or https://',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     onSave({
-      content,
+      content: barcodeType === 'qrcode' && urlInput ? urlInput : content,
       barcodeType,
-      showText,
+      showText: showText && !isQrCode,
       width,
       height,
       foregroundColor,
       backgroundColor,
-      url: url || undefined
+      url: urlInput || undefined,
+      qrStyle,
     });
     onOpenChange(false);
   };
@@ -101,7 +123,7 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Configure Barcode</DialogTitle>
+          <DialogTitle>Configure {barcodeType === 'qrcode' ? 'QR Code' : 'Barcode'}</DialogTitle>
         </DialogHeader>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -112,7 +134,7 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
           
           <TabsContent value="content" className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label>Barcode Type</Label>
+              <Label>Type</Label>
               <Select value={barcodeType} onValueChange={setBarcodeType}>
                 <SelectTrigger>
                   <SelectValue />
@@ -127,32 +149,44 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
               </Select>
             </div>
             
-            <div className="space-y-2">
-              <Label>Barcode Content</Label>
-              <Input 
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={isQrCode ? "QR content or URL" : "123456789"}
-              />
-              <p className="text-xs text-muted-foreground">
-                {isQrCode 
-                  ? "Enter text or a URL to encode in the QR code" 
-                  : "Enter numbers or text for the barcode"}
-              </p>
-            </div>
-            
-            {isQrCode && (
-              <div className="space-y-2 border-t pt-4">
-                <Label>Link URL (Optional)</Label>
+            {barcodeType === 'qrcode' ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>URL</Label>
+                  <Input 
+                    type="url"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    placeholder="https://example.com"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter a URL starting with http:// or https://
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>QR Style</Label>
+                  <Select value={qrStyle} onValueChange={setQrStyle}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="classic">Classic</SelectItem>
+                      <SelectItem value="rounded">Rounded Corners</SelectItem>
+                      <SelectItem value="colored">Custom Color</SelectItem>
+                      <SelectItem value="logo">With Logo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Barcode Content</Label>
                 <Input 
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://example.com"
-                  type="url"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="123456789"
                 />
-                <p className="text-xs text-muted-foreground">
-                  When scanned, this URL will be opened. Leave empty if you don't want a link.
-                </p>
               </div>
             )}
           </TabsContent>
@@ -247,50 +281,47 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
             className="p-2 border rounded flex items-center justify-center"
             style={{ height: '100px', backgroundColor }}
           >
-            {/* This is a simple representation - in a real app you'd render the actual barcode */}
-            <div className="flex flex-col items-center">
-              {barcodeType === 'qrcode' ? (
-                <div
-                  style={{ 
-                    width: '80px', 
-                    height: '80px', 
-                    backgroundColor: foregroundColor,
-                    clipPath: 'polygon(0% 0%, 0% 75%, 25% 75%, 25% 25%, 75% 25%, 75% 75%, 25% 75%, 25% 100%, 100% 100%, 100% 0%)'
-                  }}
-                ></div>
-              ) : (
-                <>
+            {barcodeType === 'qrcode' ? (
+              <div
+                style={{ 
+                  width: '80px', 
+                  height: '80px', 
+                  backgroundColor: foregroundColor,
+                  clipPath: 'polygon(0% 0%, 0% 75%, 25% 75%, 25% 25%, 75% 25%, 75% 75%, 25% 75%, 25% 100%, 100% 100%, 100% 0%)'
+                }}
+              ></div>
+            ) : (
+              <>
+                <div style={{ 
+                  width: '100px', 
+                  height: '50px', 
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  {Array.from({ length: 15 }).map((_, i) => (
+                    <div 
+                      key={i} 
+                      style={{ 
+                        width: (i % 3 === 0) ? '4px' : '2px', 
+                        height: '100%', 
+                        backgroundColor: foregroundColor 
+                      }}
+                    ></div>
+                  ))}
+                </div>
+                
+                {showText && !isQrCode && (
                   <div style={{ 
-                    width: '100px', 
-                    height: '50px', 
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
+                    marginTop: '5px',
+                    fontSize: '12px',
+                    color: foregroundColor
                   }}>
-                    {Array.from({ length: 15 }).map((_, i) => (
-                      <div 
-                        key={i} 
-                        style={{ 
-                          width: (i % 3 === 0) ? '4px' : '2px', 
-                          height: '100%', 
-                          backgroundColor: foregroundColor 
-                        }}
-                      ></div>
-                    ))}
+                    {content || '123456789'}
                   </div>
-                  
-                  {showText && !isQrCode && (
-                    <div style={{ 
-                      marginTop: '5px',
-                      fontSize: '12px',
-                      color: foregroundColor
-                    }}>
-                      {content || '123456789'}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+                )}
+              </>
+            )}
           </div>
         </div>
         

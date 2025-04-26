@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export async function setupStorageBucket() {
@@ -24,15 +23,21 @@ export async function setupStorageBucket() {
         
         if (createBucketError) {
           console.error('Error creating template_assets bucket:', createBucketError);
+          return false;
         } else {
           console.log('Created template_assets bucket successfully');
           
-          // Get public URL for the bucket to test it (not checking for error here)
+          // Get public URL for the bucket to test it
           const { data } = await supabase.storage.from('template_assets').getPublicUrl('test.txt');
-          console.log('Public URL test:', data.publicUrl);
+          if (data) {
+            console.log('Public URL test:', data.publicUrl);
+            return true;
+          }
+          return false;
         }
       } catch (error) {
         console.error('Error in setupStorageBucket:', error);
+        return false;
       }
     } else {
       console.log('template_assets bucket already exists');
@@ -45,19 +50,22 @@ export async function setupStorageBucket() {
         
         if (updateBucketError) {
           console.error('Error updating template_assets bucket:', updateBucketError);
+          return false;
         } else {
           console.log('Updated template_assets bucket successfully');
+          return true;
         }
       } catch (error) {
         console.error('Error updating bucket settings:', error);
+        return false;
       }
     }
   } catch (error) {
     console.error('Unexpected error in setupStorageBucket:', error);
+    return false;
   }
 }
 
-// Add updateRLS function to update bucket policies if needed
 export async function updateBucketPolicies() {
   try {
     console.log('Updating bucket policies...');
@@ -77,7 +85,6 @@ export async function updateBucketPolicies() {
   }
 }
 
-// Ensure bucket exists and call it from DesignerPage
 export async function ensureStorageBucketExists() {
   try {
     console.log('Ensuring storage bucket exists...');
