@@ -10,7 +10,7 @@ import CanvasGrid from './CanvasGrid';
 import CanvasRulers from './CanvasRulers';
 import TextEditor from './TextEditor';
 import ImageUploader from './ImageUploader';
-import BarcodeEditor from './BarcodeEditor';
+import BarcodeEditor from './editors/BarcodeEditor';
 import { GridSettings } from '@/types/designer';
 
 interface CanvasProps {
@@ -52,7 +52,6 @@ const Canvas: React.FC<CanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [panStartPos, setPanStartPos] = useState({ x: 0, y: 0 });
 
-  // Query to get template data
   const { data: template, isLoading: isTemplateLoading } = useQuery({
     queryKey: ['template', templateId],
     queryFn: async () => {
@@ -84,7 +83,6 @@ const Canvas: React.FC<CanvasProps> = ({
       : template.grid_settings as unknown as GridSettings) 
     : { showGrid: true, gridSize: 10 };
 
-  // Query to get template elements
   const { data: templateElements, isLoading } = useQuery({
     queryKey: ['template-elements', templateId],
     queryFn: async () => {
@@ -113,7 +111,6 @@ const Canvas: React.FC<CanvasProps> = ({
     (element) => element.id === selectedElement
   );
 
-  // Mutation to add a new element
   const addElementMutation = useMutation({
     mutationFn: async (newElement: {
       type: string;
@@ -164,7 +161,6 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   });
 
-  // Mutation to update an element
   const updateElementMutation = useMutation({
     mutationFn: async ({ 
       id, 
@@ -201,7 +197,6 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   });
 
-  // Mutation to delete an element
   const deleteElementMutation = useMutation({
     mutationFn: async (elementId: string) => {
       const { error } = await supabase
@@ -232,7 +227,6 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   });
 
-  // Element creation handlers
   const handleAddTextElement = () => {
     if (!templateId) {
       toast({
@@ -336,7 +330,6 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
-  // Element interaction handlers
   const handleElementDoubleClick = (elementId: string, elementType: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedElement(elementId);
@@ -518,7 +511,6 @@ const Canvas: React.FC<CanvasProps> = ({
     setResizeStartData(null);
   }, [isResizing, selectedElement, templateElements, updateElementMutation]);
 
-  // Canvas navigation/interaction handlers
   const handlePanStart = (e: React.MouseEvent) => {
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       setIsPanning(true);
@@ -637,7 +629,6 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
-  // Event listeners
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleDrag);
@@ -664,7 +655,6 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [isDragging, isResizing, isPanning, handleDrag, handleDragEnd, handleResize, handleResizeEnd, handlePan, handlePanEnd]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'z' && e.ctrlKey) {
@@ -708,7 +698,6 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [selectedElement, templateElements, updateElementMutation]);
 
-  // Window resize handler
   useEffect(() => {
     const handleResize = () => {
       if (canvasRef.current && templateId) {
@@ -723,7 +712,6 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [templateId]);
 
-  // Custom event listeners
   useEffect(() => {
     const handleAddElement = (event: Event) => {
       const customEvent = event as CustomEvent;
