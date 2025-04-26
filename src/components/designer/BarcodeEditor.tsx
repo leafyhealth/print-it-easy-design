@@ -1,10 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog,
   DialogContent, 
   DialogHeader, 
   DialogTitle, 
-  DialogFooter
+  DialogFooter,
+  DialogDescription
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +35,7 @@ interface BarcodeEditorProps {
     backgroundColor: string;
     url?: string;
     qrStyle?: string;
+    isUrl?: boolean;
   }) => void;
   initialProperties?: {
     content?: string;
@@ -43,6 +46,8 @@ interface BarcodeEditorProps {
     foregroundColor?: string;
     backgroundColor?: string;
     url?: string;
+    qrStyle?: string;
+    isUrl?: boolean;
   };
 }
 
@@ -69,8 +74,8 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
   const [backgroundColor, setBackgroundColor] = useState(initialProperties.backgroundColor || '#FFFFFF');
   const [url, setUrl] = useState(initialProperties.url || '');
   const [activeTab, setActiveTab] = useState('content');
-  const [qrStyle, setQrStyle] = useState('classic');
-  const [urlInput, setUrlInput] = useState(initialProperties.url || '');
+  const [qrStyle, setQrStyle] = useState(initialProperties.qrStyle || 'classic');
+  const [isUrl, setIsUrl] = useState(initialProperties.isUrl || false);
 
   useEffect(() => {
     if (initialProperties.content) setContent(initialProperties.content);
@@ -81,12 +86,21 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
     if (initialProperties.foregroundColor) setForegroundColor(initialProperties.foregroundColor);
     if (initialProperties.backgroundColor) setBackgroundColor(initialProperties.backgroundColor);
     if (initialProperties.url) setUrl(initialProperties.url);
+    if (initialProperties.qrStyle) setQrStyle(initialProperties.qrStyle);
+    if (initialProperties.isUrl) setIsUrl(initialProperties.isUrl);
+    
+    // If it's a QR code and we have a URL, set isUrl to true
+    if (initialProperties.barcodeType === 'qrcode' && initialProperties.content && 
+        (initialProperties.content.startsWith('http://') || initialProperties.content.startsWith('https://'))) {
+      setIsUrl(true);
+      setUrl(initialProperties.content);
+    }
   }, [initialProperties]);
 
-  const validateUrl = (url: string) => {
-    if (!url) return true;
+  const validateUrl = (urlToValidate: string) => {
+    if (!urlToValidate) return true;
     try {
-      new URL(url);
+      new URL(urlToValidate);
       return true;
     } catch {
       return false;
@@ -94,26 +108,53 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
   };
 
   const handleSave = () => {
-    if (barcodeType === 'qrcode' && urlInput && !validateUrl(urlInput)) {
-      toast({
-        title: 'Invalid URL',
-        description: 'Please enter a valid URL starting with http:// or https://',
-        variant: 'destructive'
+    // For QR codes, if isUrl is true, use the URL as content
+    if (barcodeType === 'qrcode' && isUrl) {
+      if (!url) {
+        toast({
+          title: 'URL Required',
+          description: 'Please enter a URL for your QR code',
+          variant: 'destructive'
+        });
+        return;
+      }
+      
+      if (!validateUrl(url)) {
+        toast({
+          title: 'Invalid URL',
+          description: 'Please enter a valid URL starting with http:// or https://',
+          variant: 'destructive'
+        });
+        return;
+      }
+      
+      // Save with the URL as the content
+      onSave({
+        content: url,
+        barcodeType,
+        showText: false, // QR codes don't show text
+        width,
+        height,
+        foregroundColor,
+        backgroundColor,
+        qrStyle,
+        isUrl: true
       });
-      return;
+    } else {
+      // Regular barcode or QR code with plain text
+      onSave({
+        content,
+        barcodeType,
+        showText: showText && barcodeType !== 'qrcode' && barcodeType !== 'datamatrix',
+        width,
+        height,
+        foregroundColor,
+        backgroundColor,
+        qrStyle: barcodeType === 'qrcode' ? qrStyle : undefined,
+        isUrl: false
+      });
     }
-
-    onSave({
-      content: barcodeType === 'qrcode' && urlInput ? urlInput : content,
-      barcodeType,
-      showText: showText && !isQrCode,
-      width,
-      height,
-      foregroundColor,
-      backgroundColor,
-      url: urlInput || undefined,
-      qrStyle,
-    });
+    
     onOpenChange(false);
   };
 
@@ -124,6 +165,9 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Configure {barcodeType === 'qrcode' ? 'QR Code' : 'Barcode'}</DialogTitle>
+          <DialogDescription>
+            Customize your {barcodeType === 'qrcode' ? 'QR Code' : 'Barcode'} settings
+          </DialogDescription>
         </DialogHeader>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -151,18 +195,38 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
             
             {barcodeType === 'qrcode' ? (
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>URL</Label>
-                  <Input 
-                    type="url"
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder="https://example.com"
+                <div className="flex items-center space-x-2">
+                  <Switch 
+                    id="url-mode" 
+                    checked={isUrl} 
+                    onCheckedChange={setIsUrl}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Enter a URL starting with http:// or https://
-                  </p>
+                  <Label htmlFor="url-mode">URL Mode</Label>
                 </div>
+                
+                {isUrl ? (
+                  <div className="space-y-2">
+                    <Label>URL</Label>
+                    <Input 
+                      type="url"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      placeholder="https://example.com"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter a URL starting with http:// or https://
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>QR Code Content</Label>
+                    <Input 
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      placeholder="Enter text for QR code"
+                    />
+                  </div>
+                )}
                 
                 <div className="space-y-2">
                   <Label>QR Style</Label>
@@ -282,16 +346,25 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
             style={{ height: '100px', backgroundColor }}
           >
             {barcodeType === 'qrcode' ? (
-              <div
-                style={{ 
-                  width: '80px', 
-                  height: '80px', 
-                  backgroundColor: foregroundColor,
-                  clipPath: 'polygon(0% 0%, 0% 75%, 25% 75%, 25% 25%, 75% 25%, 75% 75%, 25% 75%, 25% 100%, 100% 100%, 100% 0%)'
-                }}
-              ></div>
+              <div className="w-20 h-20 flex items-center justify-center">
+                <div
+                  style={{ 
+                    width: '80px', 
+                    height: '80px', 
+                    backgroundColor: foregroundColor,
+                    clipPath: qrStyle === 'rounded' 
+                      ? 'polygon(0% 0%, 0% 75%, 25% 75%, 25% 25%, 75% 25%, 75% 75%, 25% 75%, 25% 100%, 100% 100%, 100% 0%)'
+                      : 'polygon(0% 0%, 0% 75%, 25% 75%, 25% 25%, 75% 25%, 75% 75%, 25% 75%, 25% 100%, 100% 100%, 100% 0%)',
+                    borderRadius: qrStyle === 'rounded' ? '8px' : '0px'
+                  }}
+                >
+                  {qrStyle === 'logo' && (
+                    <div className="w-6 h-6 bg-white absolute"></div>
+                  )}
+                </div>
+              </div>
             ) : (
-              <>
+              <div className="flex flex-col items-center justify-center">
                 <div style={{ 
                   width: '100px', 
                   height: '50px', 
@@ -320,7 +393,7 @@ const BarcodeEditor: React.FC<BarcodeEditorProps> = ({
                     {content || '123456789'}
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>

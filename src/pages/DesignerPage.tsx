@@ -14,7 +14,6 @@ import { ensureStorageBucketExists } from '@/lib/setupStorage';
 
 const DesignerPage = () => {
   const queryClient = useQueryClient();
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showPaperTemplateSelector, setShowPaperTemplateSelector] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
   const [user, setUser] = useState<any>(null);
@@ -108,6 +107,9 @@ const DesignerPage = () => {
       rows: number;
       labelWidth: number;
       labelHeight: number;
+      horizontalGap?: number;
+      verticalGap?: number;
+      cornerRadius?: number;
     }) => {
       // Check if user is authenticated
       if (!user) {
@@ -118,13 +120,22 @@ const DesignerPage = () => {
       // For unit conversion: 1 inch = 96px, 1mm = 3.78px (approximation)
       let widthInPixels = templateSettings.labelWidth;
       let heightInPixels = templateSettings.labelHeight;
+      let horizontalGapPx = templateSettings.horizontalGap || 0;
+      let verticalGapPx = templateSettings.verticalGap || 0;
+      let cornerRadiusPx = templateSettings.cornerRadius || 0;
       
       if (templateSettings.unit === 'in') {
         widthInPixels = templateSettings.labelWidth * 96;
         heightInPixels = templateSettings.labelHeight * 96;
+        horizontalGapPx = (templateSettings.horizontalGap || 0) * 96;
+        verticalGapPx = (templateSettings.verticalGap || 0) * 96;
+        cornerRadiusPx = (templateSettings.cornerRadius || 0) * 96;
       } else if (templateSettings.unit === 'mm') {
         widthInPixels = templateSettings.labelWidth * 3.78;
         heightInPixels = templateSettings.labelHeight * 3.78;
+        horizontalGapPx = (templateSettings.horizontalGap || 0) * 3.78;
+        verticalGapPx = (templateSettings.verticalGap || 0) * 3.78;
+        cornerRadiusPx = (templateSettings.cornerRadius || 0) * 3.78;
       }
 
       const { data, error } = await supabase
@@ -145,9 +156,9 @@ const DesignerPage = () => {
             labelLayout: templateSettings.labelLayout,
             columns: templateSettings.columns,
             rows: templateSettings.rows,
-            horizontalGap: 0,  // Default gap values
-            verticalGap: 0,
-            cornerRadius: 0    // Default corner radius
+            horizontalGap: Math.round(horizontalGapPx),
+            verticalGap: Math.round(verticalGapPx),
+            cornerRadius: Math.round(cornerRadiusPx)
           }
         })
         .select()

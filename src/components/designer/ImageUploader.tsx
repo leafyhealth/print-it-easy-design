@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog,
@@ -10,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload, ImageIcon } from 'lucide-react';
+import { Upload, ImageIcon, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { ensureStorageBucketExists } from '@/lib/setupStorage';
@@ -33,6 +34,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [recentImages, setRecentImages] = useState<string[]>([]);
   const [bucketReady, setBucketReady] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Setup bucket and load recent images when the dialog opens
   useEffect(() => {
@@ -43,14 +45,25 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           const success = await ensureStorageBucketExists();
           setBucketReady(success);
           
-          if (success && templateId) {
-            await fetchRecentImages();
+          if (!success) {
+            setUploadError("Storage not available. Please try again later.");
+            toast({
+              title: "Storage Setup Failed",
+              description: "Unable to setup storage for uploads. You can still use external image URLs.",
+              variant: "destructive"
+            });
+          } else {
+            setUploadError(null);
+            if (templateId) {
+              await fetchRecentImages();
+            }
           }
         } catch (error) {
           console.error("Error setting up storage:", error);
+          setUploadError("Storage setup failed");
           toast({
             title: "Storage Error",
-            description: "Could not set up storage for uploads",
+            description: "Could not set up storage for uploads. You can still use external image URLs.",
             variant: "destructive"
           });
         }
@@ -102,6 +115,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       }
       
       setSelectedFile(file);
+      setUploadError(null);
       
       // Create preview URL
       const reader = new FileReader();
@@ -113,23 +127,37 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
   
   const handleUpload = async () => {
-    if (!selectedFile || !bucketReady) {
-      if (!bucketReady) {
-        toast({
-          title: "Storage not ready",
-          description: "The storage system is not ready. Please try again later.",
-          variant: "destructive"
-        });
-      }
+    if (!selectedFile) {
+      toast({
+        title: "No file selected",
+        description: "Please select an image to upload",
+        variant: "warning"
+      });
+      return;
+    }
+    
+    if (!bucketReady) {
+      // If bucket isn't ready, let the user know they can use an external URL instead
+      toast({
+        title: "Storage not ready",
+        description: "We're experiencing issues with our storage system. Please use an external image URL instead.",
+        variant: "destructive"
+      });
+      setUploadError("Storage not available. Please use an external URL instead.");
       return;
     }
     
     setUploading(true);
+    setUploadError(null);
     
     try {
       console.log("Starting file upload...");
       // Force bucket creation once more right before upload
-      await ensureStorageBucketExists();
+      const bucketExists = await ensureStorageBucketExists();
+      
+      if (!bucketExists) {
+        throw new Error("Storage bucket is not available");
+      }
       
       // Create filename
       const fileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
@@ -167,9 +195,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
         description: "The image has been added to your template."
       });
     } catch (error: any) {
+      const errorMessage = error.message || "An error occurred during upload";
+      setUploadError(errorMessage);
       toast({
         title: "Upload failed",
-        description: error.message || "An error occurred during upload",
+        description: errorMessage,
         variant: "destructive"
       });
       console.error('Error uploading image:', error);
@@ -184,13 +214,47 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     const url = (form.elements.namedItem('imageUrl') as HTMLInputElement).value;
     
     if (url) {
-      onImageSelect(url);
-      onOpenChange(false);
+      // Basic validation for image URL
+      if (!url.match(/\.(jpeg|jpg|gif|png|svg|webp)$/i)) {
+        toast({
+          title: "Invalid image URL",
+          description: "Please enter a URL that points to an image file",
+          variant: "warning"
+        });
+        return;
+      }
+      
+      // Test loading the image
+      const img = new Image();
+      img.onload = () => {
+        onImageSelect(url);
+        onOpenChange(false);
+      };
+      img.onerror = () => {
+        toast({
+          title: "Invalid image URL",
+          description: "Could not load image from the URL provided",
+          variant: "destructive"
+        });
+      };
+      img.src = url;
+    } else {
+      toast({
+        title: "URL required",
+        description: "Please enter an image URL",
+        variant: "warning"
+      });
     }
   };
   
   const handleSelectRecent = (imageUrl: string) => {
     onImageSelect(imageUrl);
+    onOpenChange(false);
+  };
+
+  const handlePlaceholderImage = () => {
+    const placeholderUrl = "https://via.placeholder.com/300x200?text=Placeholder+Image";
+    onImageSelect(placeholderUrl);
     onOpenChange(false);
   };
 
@@ -236,10 +300,18 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                   />
                 </label>
               </div>
+              
+              {uploadError && (
+                <div className="text-red-500 text-xs flex items-center gap-1 mt-1 bg-red-50 p-2 rounded">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>{uploadError}</span>
+                </div>
+              )}
+              
               {selectedFile && (
                 <Button 
                   onClick={handleUpload} 
-                  disabled={uploading}
+                  disabled={uploading || !!uploadError}
                   className="w-full"
                 >
                   {uploading ? 'Uploading...' : 'Upload Image'}
@@ -261,6 +333,19 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                 Use External Image
               </Button>
             </form>
+          </div>
+          
+          {/* Placeholder image option */}
+          <div className="border rounded-md p-4">
+            <h3 className="text-sm font-medium mb-2">Quick placeholder</h3>
+            <Button 
+              onClick={handlePlaceholderImage} 
+              variant="outline" 
+              className="w-full flex items-center justify-center gap-2"
+            >
+              <ImageIcon className="h-4 w-4" />
+              Use Placeholder Image
+            </Button>
           </div>
           
           {/* Recently used images */}

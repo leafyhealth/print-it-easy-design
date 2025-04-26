@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export async function setupStorageBucket() {
@@ -8,7 +9,7 @@ export async function setupStorageBucket() {
     
     if (getBucketsError) {
       console.error('Error checking storage buckets:', getBucketsError);
-      return;
+      return false;
     }
     
     // If bucket doesn't exist, create it
@@ -29,11 +30,8 @@ export async function setupStorageBucket() {
           
           // Get public URL for the bucket to test it
           const { data } = await supabase.storage.from('template_assets').getPublicUrl('test.txt');
-          if (data) {
-            console.log('Public URL test:', data.publicUrl);
-            return true;
-          }
-          return false;
+          console.log('Public URL test:', data.publicUrl);
+          return true;
         }
       } catch (error) {
         console.error('Error in setupStorageBucket:', error);
@@ -88,9 +86,9 @@ export async function updateBucketPolicies() {
 export async function ensureStorageBucketExists() {
   try {
     console.log('Ensuring storage bucket exists...');
-    await setupStorageBucket();
+    const result = await setupStorageBucket();
     console.log('Storage bucket setup complete');
-    return true;
+    return result;
   } catch (error) {
     console.error('Failed to ensure storage bucket exists:', error);
     return false;

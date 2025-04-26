@@ -33,9 +33,11 @@ export interface TextElement extends ElementBase {
 
 export interface BarcodeElement extends ElementBase {
   type: 'barcode';
-  barcodeType: 'qr' | 'code128' | 'ean13';
+  barcodeType: 'qr' | 'code128' | 'ean13' | 'qrcode';
   content: string;
   showText: boolean;
+  isUrl?: boolean;
+  qrStyle?: 'classic' | 'rounded' | 'colored' | 'logo';
 }
 
 export interface ImageElement extends ElementBase {
@@ -59,16 +61,28 @@ export type DesignElement =
   | ImageElement 
   | ShapeElement;
 
+export interface GridSettings {
+  showGrid?: boolean;
+  gridSize?: number;
+  paperFormat?: string;
+  paperWidth?: number;
+  paperHeight?: number;
+  unit?: string;
+  labelLayout?: string;
+  columns?: number;
+  rows?: number;
+  horizontalGap?: number;
+  verticalGap?: number;
+  cornerRadius?: number;
+}
+
 export interface LabelTemplate {
   id: string;
   name: string;
   description: string;
   size: Size;
   elements: DesignElement[];
-  gridSettings: {
-    showGrid: boolean;
-    gridSize: number;
-  };
+  gridSettings: GridSettings;
   lastModified: string;
 }
 

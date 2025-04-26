@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { DesignElement } from '@/types/designer';
+import { DesignElement, GridSettings } from '@/types/designer';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { Trash, Save, Image, Text, SquarePlus, Printer, ZoomIn, ZoomOut, Ruler, Grid3x3 } from 'lucide-react';
@@ -11,21 +11,6 @@ import ImageUploader from './ImageUploader';
 import BarcodeEditor from './BarcodeEditor';
 import ZoomControls from './ZoomControls';
 import VisualAidTools from './VisualAidTools';
-
-interface GridSettings {
-  showGrid?: boolean;
-  gridSize?: number;
-  paperFormat?: string;
-  paperWidth?: number;
-  paperHeight?: number;
-  unit?: string;
-  labelLayout?: string;
-  columns?: number;
-  rows?: number;
-  horizontalGap?: number;
-  verticalGap?: number;
-  cornerRadius?: number;
-}
 
 interface CanvasProps {
   width?: number;
@@ -40,6 +25,7 @@ const Canvas: React.FC<CanvasProps> = ({
   showGrid: initialShowGrid = true,
   templateId,
 }) => {
+  // ... keep existing code (function and state declarations)
   const queryClient = useQueryClient();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
@@ -66,7 +52,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStartPos, setPanStartPos] = useState({ x: 0, y: 0 });
-  
+
   // Fetch template elements
   const { data: template, isLoading: isTemplateLoading } = useQuery({
     queryKey: ['template', templateId],
@@ -93,6 +79,13 @@ const Canvas: React.FC<CanvasProps> = ({
     enabled: !!templateId
   });
 
+  // Extract grid settings from the template
+  const gridSettings: GridSettings = template?.grid_settings ? 
+    (typeof template.grid_settings === 'string' 
+      ? JSON.parse(template.grid_settings) 
+      : template.grid_settings as unknown as GridSettings) 
+    : { showGrid: true, gridSize: 10 };
+
   // Fetch template elements
   const { data: templateElements, isLoading } = useQuery({
     queryKey: ['template-elements', templateId],
@@ -118,6 +111,7 @@ const Canvas: React.FC<CanvasProps> = ({
     enabled: !!templateId
   });
 
+  // ... keep existing code (selected element and mutations)
   // Get the selected element
   const selectedElementData = templateElements?.find(
     (element) => element.id === selectedElement
@@ -338,6 +332,7 @@ const Canvas: React.FC<CanvasProps> = ({
     addElementMutation.mutate(newBarcodeElement);
   };
   
+  // ... keep existing code (element editing methods)
   // Edit text element
   const handleEditText = () => {
     if (selectedElement && selectedElementData?.type === 'text') {
@@ -375,7 +370,8 @@ const Canvas: React.FC<CanvasProps> = ({
       });
     }
   };
-  
+
+  // ... keep existing code (event handlers)
   // Double click to edit elements
   const handleElementDoubleClick = (elementId: string, elementType: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -499,7 +495,8 @@ const Canvas: React.FC<CanvasProps> = ({
       direction
     });
   };
-  
+
+  // ... keep existing code (resizing, panning, etc.)
   // Handle resize
   const handleResize = useCallback((e: MouseEvent) => {
     if (!isResizing || !selectedElement || !templateElements || !resizeStartData) return;
@@ -608,7 +605,8 @@ const Canvas: React.FC<CanvasProps> = ({
     setIsPanning(false);
   }, []);
 
-  // Handle zoom with mouse wheel
+  // ... keep existing code (zoom, lifecycle events)
+  // Handle wheel with mouse wheel
   const handleWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey) {
       e.preventDefault();
@@ -686,7 +684,8 @@ const Canvas: React.FC<CanvasProps> = ({
       y: (canvasHeight / 2) - (centerY * (scale / 100))
     });
   };
-  
+
+  // ... keep existing code (alignment methods)
   // Align selected elements horizontally
   const handleAlignHorizontal = (position: 'start' | 'center' | 'end') => {
     if (!selectedElement || !templateElements) return;
@@ -750,7 +749,8 @@ const Canvas: React.FC<CanvasProps> = ({
       }
     });
   };
-  
+
+  // ... keep existing code (effects)
   // Set up mouse move and mouse up event listeners for dragging and resizing
   useEffect(() => {
     if (isDragging) {
@@ -787,6 +787,7 @@ const Canvas: React.FC<CanvasProps> = ({
     document.dispatchEvent(event);
   };
   
+  // ... keep existing code (keyboard shortcuts)
   // Add event listeners for keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -839,6 +840,7 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [selectedElement, templateElements, updateElementMutation]);
 
+  // ... keep existing code (document resize)
   // Listen for document resize to adjust zoom
   useEffect(() => {
     const handleResize = () => {
@@ -854,6 +856,7 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [templateId]);
 
+  // ... keep existing code (document events)
   // Add event listeners for component control from parent components
   useEffect(() => {
     const handleAddElement = (event: Event) => {
@@ -890,7 +893,8 @@ const Canvas: React.FC<CanvasProps> = ({
       document.removeEventListener('add-barcode-element', handleAddBarcodeElement);
     };
   }, []);
-  
+
+  // ... keep existing code (resize handlers)
   // Render resize handles for selected element
   const renderResizeHandles = (elementId: string) => {
     if (selectedElement !== elementId) return null;
@@ -952,6 +956,7 @@ const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
+  // ... keep existing code (rulers)
   // Render horizontal ruler
   const renderHorizontalRuler = () => {
     if (!showRulers) return null;
@@ -973,450 +978,3 @@ const Canvas: React.FC<CanvasProps> = ({
         }}
       >
         {Array.from({ length: numTicks }).map((_, i) => {
-          const isMajor = i % (majorTick / minorTick) === 0;
-          const tickHeight = isMajor ? 10 : 5;
-          const tickPosition = i * minorTick * (zoomLevel / 100);
-          
-          return (
-            <div
-              key={`h-tick-${i}`}
-              className="absolute top-0 border-l border-gray-400"
-              style={{
-                height: `${tickHeight}px`,
-                left: `${tickPosition}px`,
-              }}
-            >
-              {isMajor && (
-                <div 
-                  className="text-xs text-gray-600 absolute"
-                  style={{
-                    left: '2px',
-                    top: '10px',
-                    fontSize: '8px'
-                  }}
-                >
-                  {i * minorTick}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-  
-  // Render vertical ruler
-  const renderVerticalRuler = () => {
-    if (!showRulers) return null;
-    
-    const rulerWidth = 20;
-    const scaledHeight = height * (zoomLevel / 100);
-    const majorTick = 10; // Pixels between major ticks at 100% zoom
-    const minorTick = 5; // Pixels between minor ticks at 100% zoom
-    const numTicks = Math.floor(height / minorTick);
-    
-    return (
-      <div 
-        className="absolute left-0 top-0 bg-gray-100 border-r border-b border-gray-300"
-        style={{
-          width: `${rulerWidth}px`,
-          height: `${scaledHeight}px`,
-          zIndex: 10
-        }}
-      >
-        {Array.from({ length: numTicks }).map((_, i) => {
-          const isMajor = i % (majorTick / minorTick) === 0;
-          const tickWidth = isMajor ? 10 : 5;
-          const tickPosition = i * minorTick * (zoomLevel / 100);
-          
-          return (
-            <div
-              key={`v-tick-${i}`}
-              className="absolute left-0 border-t border-gray-400"
-              style={{
-                width: `${tickWidth}px`,
-                top: `${tickPosition}px`,
-              }}
-            >
-              {isMajor && (
-                <div 
-                  className="text-xs text-gray-600 absolute"
-                  style={{
-                    left: '2px',
-                    top: '0px',
-                    fontSize: '8px'
-                  }}
-                >
-                  {i * minorTick}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  // Render Paper boundaries
-  const renderPaperBoundaries = () => {
-    const paperWidth = width;
-    const paperHeight = height;
-    const templateWidth = template?.width || width;
-    const templateHeight = template?.height || height;
-    
-    // Calculate paper and template boundaries
-    const paperTop = 0;
-    const paperLeft = 0;
-    
-    // Extract grid settings safely
-    const gridSettings: GridSettings = template?.grid_settings && typeof template.grid_settings === 'object' 
-      ? template.grid_settings as unknown as GridSettings 
-      : { showGrid: true, gridSize: 10 };
-    
-    // Yellow background for paper
-    return (
-      <>
-        <div 
-          className="absolute bg-yellow-50"
-          style={{
-            left: `${paperLeft}px`,
-            top: `${paperTop}px`,
-            width: `${paperWidth}px`,
-            height: `${paperHeight}px`,
-          }}
-        />
-        
-        {/* Label boundaries */}
-        {gridSettings.columns && gridSettings.rows && (
-          <>
-            {Array.from({ length: gridSettings.columns * gridSettings.rows }).map((_, i) => {
-              const col = i % gridSettings.columns;
-              const row = Math.floor(i / gridSettings.columns);
-              
-              // Calculate label position
-              const gridWidth = paperWidth / gridSettings.columns;
-              const gridHeight = paperHeight / gridSettings.rows;
-              
-              // Apply gaps
-              const gapH = gridSettings.horizontalGap || 0;
-              const gapV = gridSettings.verticalGap || 0;
-              
-              const labelWidth = gridWidth - gapH;
-              const labelHeight = gridHeight - gapV;
-              
-              const labelLeft = paperLeft + (col * gridWidth) + (gapH / 2);
-              const labelTop = paperTop + (row * gridHeight) + (gapV / 2);
-              
-              return (
-                <div 
-                  key={`label-${i}`}
-                  className="absolute bg-white border border-gray-200"
-                  style={{
-                    left: `${labelLeft}px`,
-                    top: `${labelTop}px`,
-                    width: `${labelWidth}px`,
-                    height: `${labelHeight}px`,
-                    borderRadius: gridSettings.cornerRadius || 0,
-                  }}
-                />
-              );
-            })}
-          </>
-        )}
-        
-        {/* Safety margin indicator (red line) */}
-        {showMargins && (
-          <div 
-            className="absolute border border-red-500 pointer-events-none"
-            style={{
-              left: `${paperLeft + 5}px`,
-              top: `${paperTop + 5}px`,
-              width: `${paperWidth - 10}px`,
-              height: `${paperHeight - 10}px`,
-            }}
-          />
-        )}
-      </>
-    );
-  };
-
-  // Render elements
-  const renderElements = () => {
-    if (!templateElements || templateElements.length === 0) return null;
-
-    return templateElements.map((element) => {
-      const position = element.position as any;
-      const size = element.size as any;
-      const properties = element.properties as any;
-      
-      return (
-        <div
-          key={element.id}
-          className={cn(
-            "absolute border-2 cursor-move",
-            selectedElement === element.id 
-              ? "border-designer-primary z-10" 
-              : "border-transparent hover:border-designer-primary/50"
-          )}
-          style={{
-            left: `${position.x}px`,
-            top: `${position.y}px`,
-            width: `${size.width}px`,
-            height: `${size.height}px`,
-            transform: `rotate(${element.rotation}deg)`
-          }}
-          onClick={(e) => handleElementClick(element.id, e)}
-          onMouseDown={(e) => handleDragStart(e, element.id)}
-          onDoubleClick={(e) => handleElementDoubleClick(element.id, element.type, e)}
-        >
-          {element.type === 'text' && (
-            <div 
-              className="w-full h-full flex items-center overflow-hidden"
-              style={{
-                fontFamily: properties.fontFamily || 'Arial',
-                fontSize: `${properties.fontSize || 16}px`,
-                fontWeight: properties.fontWeight || 'normal',
-                fontStyle: properties.fontStyle || 'normal',
-                textAlign: properties.textAlign || 'left',
-                textDecoration: properties.textDecoration || 'none',
-                color: properties.color || '#000000',
-                padding: '4px'
-              }}
-            >
-              {properties.content || 'Sample Text'}
-            </div>
-          )}
-          
-          {element.type === 'image' && (
-            <img 
-              src={properties.src} 
-              alt={element.name}
-              className="w-full h-full object-contain"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/200x200?text=Image+Error';
-              }}
-            />
-          )}
-          
-          {element.type === 'barcode' && (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-white p-1">
-              {/* Simulate barcode display - this should be replaced with actual barcode rendering */}
-              <div style={{ 
-                width: '80%', 
-                height: properties.showText ? '70%' : '100%', 
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '0 5px',
-                backgroundColor: properties.backgroundColor || 'white'
-              }}>
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <div 
-                    key={i} 
-                    style={{ 
-                      width: (i % 3 === 0) ? '4px' : '2px', 
-                      height: '100%', 
-                      backgroundColor: properties.foregroundColor || 'black' 
-                    }}
-                  ></div>
-                ))}
-              </div>
-              
-              {properties.showText && (
-                <div style={{ 
-                  marginTop: '5px',
-                  fontSize: '12px',
-                  color: properties.foregroundColor || 'black',
-                  textAlign: 'center'
-                }}>
-                  {properties.content || '123456789'}
-                </div>
-              )}
-            </div>
-          )}
-          
-          {renderResizeHandles(element.id)}
-        </div>
-      );
-    });
-  };
-
-  // Draw gridlines
-  const renderGrid = () => {
-    if (!showGridState) return null;
-    
-    const gridSize = 10; // pixels between grid lines at 100% zoom
-    const scaledWidth = width * (zoomLevel / 100);
-    const scaledHeight = height * (zoomLevel / 100);
-    
-    const horizontalLines = Math.floor(height / gridSize);
-    const verticalLines = Math.floor(width / gridSize);
-    
-    return (
-      <>
-        {/* Horizontal grid lines */}
-        {Array.from({ length: horizontalLines }).map((_, i) => (
-          <div
-            key={`h-grid-${i}`}
-            className="absolute left-0 border-t border-gray-200"
-            style={{
-              width: `${scaledWidth}px`,
-              top: `${i * gridSize * (zoomLevel / 100)}px`,
-            }}
-          />
-        ))}
-        
-        {/* Vertical grid lines */}
-        {Array.from({ length: verticalLines }).map((_, i) => (
-          <div
-            key={`v-grid-${i}`}
-            className="absolute top-0 border-l border-gray-200"
-            style={{
-              height: `${scaledHeight}px`,
-              left: `${i * gridSize * (zoomLevel / 100)}px`,
-            }}
-          />
-        ))}
-      </>
-    );
-  };
-
-  return (
-    <div className="relative overflow-auto h-full flex flex-col items-center justify-center bg-designer-canvas p-4">
-      <div className="flex flex-col mb-4 w-full">
-        <div className="flex justify-between items-center mb-2">
-          <div className="flex space-x-2">
-            <Button onClick={handleAddTextElement} variant="outline" className="flex items-center gap-1">
-              <Text className="h-4 w-4" />
-              Add Text
-            </Button>
-            <Button onClick={handleAddImageElement} variant="outline" className="flex items-center gap-1">
-              <Image className="h-4 w-4" />
-              Add Image
-            </Button>
-            <Button onClick={handleAddBarcodeElement} variant="outline" className="flex items-center gap-1">
-              <SquarePlus className="h-4 w-4" />
-              Add Barcode
-            </Button>
-            
-            {selectedElement && selectedElementData?.type === 'text' && (
-              <Button onClick={handleEditText} variant="outline" className="flex items-center gap-1">
-                <Text className="h-4 w-4" />
-                Edit Text
-              </Button>
-            )}
-            
-            {selectedElement && (
-              <Button onClick={handleDeleteElement} variant="outline" className="flex items-center gap-1 text-red-500">
-                <Trash className="h-4 w-4" />
-                Delete
-              </Button>
-            )}
-          </div>
-          
-          <ZoomControls 
-            zoomLevel={zoomLevel}
-            onZoomChange={setZoomLevel}
-            onZoomFit={handleZoomFit}
-            onZoomObjects={handleZoomObjects}
-          />
-        </div>
-        
-        <VisualAidTools
-          showGrid={showGridState}
-          showRulers={showRulers}
-          showSnaplines={showSnaplines}
-          showMargins={showMargins}
-          onToggleGrid={() => setShowGridState(!showGridState)}
-          onToggleRulers={() => setShowRulers(!showRulers)}
-          onToggleSnaplines={() => setShowSnaplines(!showSnaplines)}
-          onToggleMargins={() => setShowMargins(!showMargins)}
-          onAlignHorizontal={handleAlignHorizontal}
-          onAlignVertical={handleAlignVertical}
-        />
-      </div>
-      
-      <div 
-        ref={canvasRef}
-        className="relative overflow-hidden border border-gray-300 bg-gray-200"
-        style={{
-          width: 'calc(100% - 20px)',
-          height: 'calc(100% - 120px)',
-        }}
-        onClick={handleCanvasClick}
-        onMouseDown={handlePanStart}
-        onWheel={handleWheel}
-      >
-        <div
-          className={cn(
-            "absolute",
-            { "canvas-grid": showGridState }
-          )}
-          style={{
-            transform: `translate(${canvasPan.x}px, ${canvasPan.y}px) scale(${zoomLevel / 100})`,
-            transformOrigin: '0 0',
-            width: `${width}px`,
-            height: `${height}px`,
-            transition: 'transform 0.1s ease-in-out',
-          }}
-        >
-          {renderPaperBoundaries()}
-          {renderGrid()}
-          {renderElements()}
-        </div>
-        
-        {renderHorizontalRuler()}
-        {renderVerticalRuler()}
-        
-        {/* Show zoom indicator */}
-        <div className="absolute bottom-2 right-2 bg-white/80 px-2 py-1 rounded text-xs">
-          {zoomLevel}%
-        </div>
-        
-        {/* Info on how to navigate */}
-        <div className="absolute bottom-2 left-2 bg-white/80 px-2 py-1 rounded text-xs max-w-xs">
-          💡 Tip: Use Ctrl+Scroll to zoom, Alt+Drag to pan
-        </div>
-        
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/50">
-            <p>Loading elements...</p>
-          </div>
-        )}
-      </div>
-      
-      {/* Text Editor Dialog */}
-      <TextEditor
-        open={showTextEditor}
-        onOpenChange={setShowTextEditor}
-        onSave={handleSaveTextChanges}
-        initialProperties={
-          selectedElementData?.type === 'text'
-            ? (selectedElementData?.properties as any)
-            : undefined
-        }
-      />
-      
-      {/* Image Uploader Dialog */}
-      <ImageUploader
-        open={showImageUploader}
-        onOpenChange={setShowImageUploader}
-        onImageSelect={handleImageSelect}
-        templateId={templateId}
-      />
-      
-      {/* Barcode Editor Dialog */}
-      <BarcodeEditor
-        open={showBarcodeEditor}
-        onOpenChange={setShowBarcodeEditor}
-        onSave={handleBarcodeConfigured}
-        initialProperties={
-          selectedElementData?.type === 'barcode'
-            ? (selectedElementData?.properties as any)
-            : undefined
-        }
-      />
-    </div>
-  );
-};
-
-export default Canvas;
