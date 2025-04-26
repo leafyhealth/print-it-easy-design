@@ -25,7 +25,6 @@ const Canvas: React.FC<CanvasProps> = ({
   showGrid: initialShowGrid = true,
   templateId,
 }) => {
-  // ... keep existing code (function and state declarations)
   const queryClient = useQueryClient();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
@@ -43,7 +42,6 @@ const Canvas: React.FC<CanvasProps> = ({
     direction: string;
   } | null>(null);
   
-  // Canvas view settings
   const [zoomLevel, setZoomLevel] = useState(100);
   const [showRulers, setShowRulers] = useState(true);
   const [showSnaplines, setShowSnaplines] = useState(true);
@@ -53,7 +51,6 @@ const Canvas: React.FC<CanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [panStartPos, setPanStartPos] = useState({ x: 0, y: 0 });
 
-  // Fetch template elements
   const { data: template, isLoading: isTemplateLoading } = useQuery({
     queryKey: ['template', templateId],
     queryFn: async () => {
@@ -79,14 +76,12 @@ const Canvas: React.FC<CanvasProps> = ({
     enabled: !!templateId
   });
 
-  // Extract grid settings from the template
   const gridSettings: GridSettings = template?.grid_settings ? 
     (typeof template.grid_settings === 'string' 
       ? JSON.parse(template.grid_settings) 
       : template.grid_settings as unknown as GridSettings) 
     : { showGrid: true, gridSize: 10 };
 
-  // Fetch template elements
   const { data: templateElements, isLoading } = useQuery({
     queryKey: ['template-elements', templateId],
     queryFn: async () => {
@@ -111,13 +106,10 @@ const Canvas: React.FC<CanvasProps> = ({
     enabled: !!templateId
   });
 
-  // ... keep existing code (selected element and mutations)
-  // Get the selected element
   const selectedElementData = templateElements?.find(
     (element) => element.id === selectedElement
   );
 
-  // Mutation to add a new element
   const addElementMutation = useMutation({
     mutationFn: async (newElement: {
       type: string;
@@ -168,7 +160,6 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   });
 
-  // Mutation to update an element
   const updateElementMutation = useMutation({
     mutationFn: async ({ 
       id, 
@@ -204,8 +195,7 @@ const Canvas: React.FC<CanvasProps> = ({
       queryClient.invalidateQueries({ queryKey: ['template-elements', templateId] });
     }
   });
-  
-  // Mutation to delete an element
+
   const deleteElementMutation = useMutation({
     mutationFn: async (elementId: string) => {
       const { error } = await supabase
@@ -236,7 +226,6 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   });
 
-  // Add a text element
   const handleAddTextElement = () => {
     if (!templateId) {
       toast({
@@ -268,8 +257,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
     addElementMutation.mutate(newTextElement);
   };
-  
-  // Add an image element
+
   const handleAddImageElement = () => {
     if (!templateId) {
       toast({
@@ -282,8 +270,7 @@ const Canvas: React.FC<CanvasProps> = ({
     
     setShowImageUploader(true);
   };
-  
-  // Handle image selection from uploader
+
   const handleImageSelect = (imageUrl: string) => {
     const newImageElement = {
       type: 'image',
@@ -300,8 +287,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
     addElementMutation.mutate(newImageElement);
   };
-  
-  // Add a barcode element
+
   const handleAddBarcodeElement = () => {
     if (!templateId) {
       toast({
@@ -314,8 +300,7 @@ const Canvas: React.FC<CanvasProps> = ({
     
     setShowBarcodeEditor(true);
   };
-  
-  // Handle barcode configuration
+
   const handleBarcodeConfigured = (barcodeProps: any) => {
     const newBarcodeElement = {
       type: 'barcode',
@@ -331,9 +316,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
     addElementMutation.mutate(newBarcodeElement);
   };
-  
-  // ... keep existing code (element editing methods)
-  // Edit text element
+
   const handleEditText = () => {
     if (selectedElement && selectedElementData?.type === 'text') {
       setShowTextEditor(true);
@@ -345,8 +328,7 @@ const Canvas: React.FC<CanvasProps> = ({
       });
     }
   };
-  
-  // Save text changes
+
   const handleSaveTextChanges = (textProperties: any) => {
     if (selectedElement) {
       updateElementMutation.mutate({
@@ -357,8 +339,7 @@ const Canvas: React.FC<CanvasProps> = ({
       });
     }
   };
-  
-  // Delete selected element
+
   const handleDeleteElement = () => {
     if (selectedElement) {
       deleteElementMutation.mutate(selectedElement);
@@ -371,8 +352,6 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
-  // ... keep existing code (event handlers)
-  // Double click to edit elements
   const handleElementDoubleClick = (elementId: string, elementType: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedElement(elementId);
@@ -382,7 +361,6 @@ const Canvas: React.FC<CanvasProps> = ({
         setShowTextEditor(true);
         break;
       case 'image':
-        // Open image editor or image selector
         setShowImageUploader(true);
         break;
       case 'barcode':
@@ -392,25 +370,21 @@ const Canvas: React.FC<CanvasProps> = ({
         break;
     }
   };
-  
-  // Handle element selection
+
   const handleElementClick = (elementId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedElement(elementId);
     
-    // Let parent components know about selection
     const event = new CustomEvent('element-selected', { 
       detail: { elementId } 
     });
     document.dispatchEvent(event);
   };
-  
-  // Handle drag start
+
   const handleDragStart = (e: React.MouseEvent, elementId: string) => {
     if (!selectedElement || selectedElement !== elementId) {
       setSelectedElement(elementId);
       
-      // Let parent components know about selection
       const event = new CustomEvent('element-selected', { 
         detail: { elementId } 
       });
@@ -423,11 +397,9 @@ const Canvas: React.FC<CanvasProps> = ({
       y: e.clientY 
     });
     
-    // Prevent default to disable browser's drag behavior
     e.preventDefault();
   };
-  
-  // Handle drag
+
   const handleDrag = useCallback((e: MouseEvent) => {
     if (!isDragging || !selectedElement || !templateElements) return;
     
@@ -442,7 +414,6 @@ const Canvas: React.FC<CanvasProps> = ({
       y: (element.position as any).y + deltaY
     };
     
-    // Update element position visually (optimistic update)
     const updatedElements = templateElements.map(el => {
       if (el.id === selectedElement) {
         return {
@@ -453,21 +424,17 @@ const Canvas: React.FC<CanvasProps> = ({
       return el;
     });
     
-    // Update drag start position
     setDragStartPos({ x: e.clientX, y: e.clientY });
     
-    // Update queryClient cache for immediate visual feedback
     queryClient.setQueryData(['template-elements', templateId], updatedElements);
   }, [isDragging, selectedElement, dragStartPos, templateElements, queryClient, templateId, zoomLevel]);
-  
-  // Handle drag end
+
   const handleDragEnd = useCallback(() => {
     if (!isDragging || !selectedElement || !templateElements) return;
     
     const element = templateElements.find(el => el.id === selectedElement);
     if (!element) return;
     
-    // Save final position to database
     updateElementMutation.mutate({ 
       id: element.id, 
       updates: { position: element.position as any } 
@@ -475,8 +442,7 @@ const Canvas: React.FC<CanvasProps> = ({
     
     setIsDragging(false);
   }, [isDragging, selectedElement, templateElements, updateElementMutation]);
-  
-  // Handle resize start
+
   const handleResizeStart = (e: React.MouseEvent, elementId: string, direction: string) => {
     e.stopPropagation();
     e.preventDefault();
@@ -496,8 +462,6 @@ const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
-  // ... keep existing code (resizing, panning, etc.)
-  // Handle resize
   const handleResize = useCallback((e: MouseEvent) => {
     if (!isResizing || !selectedElement || !templateElements || !resizeStartData) return;
     
@@ -510,7 +474,6 @@ const Canvas: React.FC<CanvasProps> = ({
     const deltaX = (e.clientX - resizeStartData.startX) / (zoomLevel / 100);
     const deltaY = (e.clientY - resizeStartData.startY) / (zoomLevel / 100);
     
-    // Calculate new dimensions based on resize direction
     if (resizeStartData.direction.includes('e')) {
       newWidth = Math.max(20, resizeStartData.startWidth + deltaX);
     }
@@ -524,13 +487,11 @@ const Canvas: React.FC<CanvasProps> = ({
       newHeight = Math.max(20, resizeStartData.startHeight - deltaY);
     }
     
-    // Update element size visually (optimistic update)
     const updatedElements = templateElements.map(el => {
       if (el.id === selectedElement) {
         const newElement = { ...el };
         newElement.size = { width: newWidth, height: newHeight };
         
-        // If resizing from left or top, also adjust position
         if (resizeStartData.direction.includes('w')) {
           const deltaPos = resizeStartData.startWidth - newWidth;
           newElement.position = { 
@@ -551,18 +512,15 @@ const Canvas: React.FC<CanvasProps> = ({
       return el;
     });
     
-    // Update queryClient cache for immediate visual feedback
     queryClient.setQueryData(['template-elements', templateId], updatedElements);
   }, [isResizing, selectedElement, resizeStartData, templateElements, queryClient, templateId, zoomLevel]);
-  
-  // Handle resize end
+
   const handleResizeEnd = useCallback(() => {
     if (!isResizing || !selectedElement || !templateElements) return;
     
     const element = templateElements.find(el => el.id === selectedElement);
     if (!element) return;
     
-    // Save final size to database
     updateElementMutation.mutate({ 
       id: element.id, 
       updates: { 
@@ -574,18 +532,15 @@ const Canvas: React.FC<CanvasProps> = ({
     setIsResizing(false);
     setResizeStartData(null);
   }, [isResizing, selectedElement, templateElements, updateElementMutation]);
-  
-  // Handle canvas panning start
+
   const handlePanStart = (e: React.MouseEvent) => {
-    // Only start panning with middle mouse button (button 1)
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       setIsPanning(true);
       setPanStartPos({ x: e.clientX, y: e.clientY });
       e.preventDefault();
     }
   };
-  
-  // Handle canvas panning
+
   const handlePan = useCallback((e: MouseEvent) => {
     if (!isPanning) return;
     
@@ -599,14 +554,11 @@ const Canvas: React.FC<CanvasProps> = ({
     
     setPanStartPos({ x: e.clientX, y: e.clientY });
   }, [isPanning, panStartPos]);
-  
-  // Handle canvas panning end
+
   const handlePanEnd = useCallback(() => {
     setIsPanning(false);
   }, []);
 
-  // ... keep existing code (zoom, lifecycle events)
-  // Handle wheel with mouse wheel
   const handleWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey) {
       e.preventDefault();
@@ -616,7 +568,6 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
-  // Zoom to fit document
   const handleZoomFit = () => {
     if (!canvasRef.current) return;
     
@@ -631,8 +582,7 @@ const Canvas: React.FC<CanvasProps> = ({
     setZoomLevel(scale);
     setCanvasPan({ x: 0, y: 0 });
   };
-  
-  // Zoom to fit all objects
+
   const handleZoomObjects = () => {
     if (!templateElements || templateElements.length === 0) {
       handleZoomFit();
@@ -654,7 +604,6 @@ const Canvas: React.FC<CanvasProps> = ({
       maxY = Math.max(maxY, position.y + size.height);
     });
     
-    // Add padding
     minX -= 20;
     minY -= 20;
     maxX += 20;
@@ -675,7 +624,6 @@ const Canvas: React.FC<CanvasProps> = ({
     
     setZoomLevel(Math.min(100, scale));
     
-    // Center objects
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
     
@@ -685,8 +633,6 @@ const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
-  // ... keep existing code (alignment methods)
-  // Align selected elements horizontally
   const handleAlignHorizontal = (position: 'start' | 'center' | 'end') => {
     if (!selectedElement || !templateElements) return;
     
@@ -696,13 +642,13 @@ const Canvas: React.FC<CanvasProps> = ({
     let newX = (element.position as any).x;
     
     switch (position) {
-      case 'start': // Left align
+      case 'start':
         newX = 0;
         break;
-      case 'center': // Center align
+      case 'center':
         newX = (width - (element.size as any).width) / 2;
         break;
-      case 'end': // Right align
+      case 'end':
         newX = width - (element.size as any).width;
         break;
     }
@@ -717,8 +663,7 @@ const Canvas: React.FC<CanvasProps> = ({
       }
     });
   };
-  
-  // Align selected elements vertically
+
   const handleAlignVertical = (position: 'start' | 'center' | 'end') => {
     if (!selectedElement || !templateElements) return;
     
@@ -728,13 +673,13 @@ const Canvas: React.FC<CanvasProps> = ({
     let newY = (element.position as any).y;
     
     switch (position) {
-      case 'start': // Top align
+      case 'start':
         newY = 0;
         break;
-      case 'center': // Middle align
+      case 'center':
         newY = (height - (element.size as any).height) / 2;
         break;
-      case 'end': // Bottom align
+      case 'end':
         newY = height - (element.size as any).height;
         break;
     }
@@ -750,8 +695,6 @@ const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
-  // ... keep existing code (effects)
-  // Set up mouse move and mouse up event listeners for dragging and resizing
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleDrag);
@@ -778,35 +721,23 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [isDragging, isResizing, isPanning, handleDrag, handleDragEnd, handleResize, handleResizeEnd, handlePan, handlePanEnd]);
 
-  // Handle canvas click (deselect)
   const handleCanvasClick = () => {
     setSelectedElement(null);
     
-    // Let parent components know about deselection
     const event = new CustomEvent('element-deselected');
     document.dispatchEvent(event);
   };
-  
-  // ... keep existing code (keyboard shortcuts)
-  // Add event listeners for keyboard shortcuts
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // We're removing the automatic delete functionality when Delete key is pressed
-      // as requested by the user
-      
-      // Ctrl+Z for undo (would need proper undo/redo implementation)
       if (e.key === 'z' && e.ctrlKey) {
         e.preventDefault();
-        // Implement undo functionality
       }
       
-      // Ctrl+Y or Ctrl+Shift+Z for redo
       if ((e.key === 'y' && e.ctrlKey) || (e.key === 'z' && e.ctrlKey && e.shiftKey)) {
         e.preventDefault();
-        // Implement redo functionality
       }
       
-      // Arrow keys for nudging selected elements
       if (selectedElement && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
         
@@ -840,8 +771,6 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [selectedElement, templateElements, updateElementMutation]);
 
-  // ... keep existing code (document resize)
-  // Listen for document resize to adjust zoom
   useEffect(() => {
     const handleResize = () => {
       if (canvasRef.current && templateId) {
@@ -856,15 +785,11 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [templateId]);
 
-  // ... keep existing code (document events)
-  // Add event listeners for component control from parent components
   useEffect(() => {
     const handleAddElement = (event: Event) => {
       const customEvent = event as CustomEvent;
       const elementType = customEvent.detail.type;
       
-      // The logic to add specific element types is in Canvas.tsx
-      // So we trigger the appropriate method there
       switch (elementType) {
         case 'text':
           document.dispatchEvent(new CustomEvent('add-text-element'));
@@ -894,8 +819,6 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, []);
 
-  // ... keep existing code (resize handlers)
-  // Render resize handles for selected element
   const renderResizeHandles = (elementId: string) => {
     if (selectedElement !== elementId) return null;
     
@@ -910,7 +833,6 @@ const Canvas: React.FC<CanvasProps> = ({
         cursor: `${dir}-resize`
       };
       
-      // Position handles based on direction
       switch (dir) {
         case 'n': 
           handleStyle.top = '-4px';
@@ -956,15 +878,13 @@ const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
-  // ... keep existing code (rulers)
-  // Render horizontal ruler
   const renderHorizontalRuler = () => {
     if (!showRulers) return null;
     
     const rulerHeight = 20;
     const scaledWidth = width * (zoomLevel / 100);
-    const majorTick = 10; // Pixels between major ticks at 100% zoom
-    const minorTick = 5; // Pixels between minor ticks at 100% zoom
+    const majorTick = 10;
+    const minorTick = 5;
     const numTicks = Math.floor(width / minorTick);
     
     return (
@@ -977,4 +897,338 @@ const Canvas: React.FC<CanvasProps> = ({
           zIndex: 10
         }}
       >
-        {Array.from({ length: numTicks }).map((_, i) => {
+        {Array.from({ length: numTicks }).map((_, i) => (
+          <div
+            key={`h-tick-${i}`}
+            className={cn(
+              "absolute top-0 h-full border-l border-gray-300",
+              i % 2 === 0 ? "h-1/2" : "h-1/4"
+            )}
+            style={{
+              left: `${(i * minorTick * (zoomLevel / 100))}px`,
+              borderLeftWidth: i % (majorTick / minorTick) === 0 ? '1px' : '0.5px'
+            }}
+          >
+            {i % (majorTick / minorTick) === 0 && (
+              <span 
+                className="absolute top-0 left-1 text-xs text-gray-600"
+                style={{ fontSize: '8px' }}
+              >
+                {i * minorTick}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderVerticalRuler = () => {
+    if (!showRulers) return null;
+    
+    const rulerWidth = 20;
+    const scaledHeight = height * (zoomLevel / 100);
+    const majorTick = 10;
+    const minorTick = 5;
+    const numTicks = Math.floor(height / minorTick);
+    
+    return (
+      <div 
+        className="absolute left-0 top-0 bg-gray-100 border-r border-b border-gray-300"
+        style={{
+          width: `${rulerWidth}px`,
+          height: `${scaledHeight}px`,
+          overflow: 'hidden',
+          zIndex: 10
+        }}
+      >
+        {Array.from({ length: numTicks }).map((_, i) => (
+          <div
+            key={`v-tick-${i}`}
+            className={cn(
+              "absolute left-0 w-full border-t border-gray-300",
+              i % 2 === 0 ? "w-1/2" : "w-1/4"
+            )}
+            style={{
+              top: `${(i * minorTick * (zoomLevel / 100))}px`,
+              borderTopWidth: i % (majorTick / minorTick) === 0 ? '1px' : '0.5px'
+            }}
+          >
+            {i % (majorTick / minorTick) === 0 && (
+              <span 
+                className="absolute top-0 left-1 text-xs text-gray-600"
+                style={{ fontSize: '8px' }}
+              >
+                {i * minorTick}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderGrid = () => {
+    if (!showGridState) return null;
+    
+    const gridSize = (gridSettings?.gridSize || 10) * (zoomLevel / 100);
+    const numHorizontalLines = Math.floor(height / (gridSettings?.gridSize || 10));
+    const numVerticalLines = Math.floor(width / (gridSettings?.gridSize || 10));
+    
+    return (
+      <>
+        {Array.from({ length: numHorizontalLines + 1 }).map((_, i) => (
+          <div
+            key={`h-grid-${i}`}
+            className="absolute left-0 w-full border-t border-gray-200"
+            style={{
+              top: `${i * gridSize}px`,
+              borderTopWidth: '0.5px'
+            }}
+          />
+        ))}
+        
+        {Array.from({ length: numVerticalLines + 1 }).map((_, i) => (
+          <div
+            key={`v-grid-${i}`}
+            className="absolute top-0 h-full border-l border-gray-200"
+            style={{
+              left: `${i * gridSize}px`,
+              borderLeftWidth: '0.5px'
+            }}
+          />
+        ))}
+      </>
+    );
+  };
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex items-center justify-between p-2 border-b bg-gray-50">
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => handleAddTextElement()}
+            title="Add Text"
+          >
+            <Text size={16} />
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => handleAddImageElement()}
+            title="Add Image"
+          >
+            <Image size={16} />
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => handleAddBarcodeElement()}
+            title="Add Barcode or QR Code"
+          >
+            <SquarePlus size={16} />
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleDeleteElement}
+            title="Delete Selected Element"
+            disabled={!selectedElement}
+          >
+            <Trash size={16} />
+          </Button>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShowRulers(!showRulers)}
+            className={showRulers ? 'bg-blue-100' : ''}
+            title="Toggle Rulers"
+          >
+            <Ruler size={16} />
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShowGridState(!showGridState)}
+            className={showGridState ? 'bg-blue-100' : ''}
+            title="Toggle Grid"
+          >
+            <Grid3x3 size={16} />
+          </Button>
+          
+          <ZoomControls 
+            zoomLevel={zoomLevel}
+            onZoomIn={() => setZoomLevel(Math.min(500, zoomLevel + 10))}
+            onZoomOut={() => setZoomLevel(Math.max(25, zoomLevel - 10))}
+            onZoomReset={() => setZoomLevel(100)}
+          />
+        </div>
+      </div>
+      
+      <div 
+        className="relative flex-1 overflow-auto bg-gray-300"
+        onWheel={handleWheel}
+        onMouseDown={handlePanStart}
+        ref={canvasRef}
+        onClick={handleCanvasClick}
+      >
+        <div
+          className="absolute bg-white shadow-lg"
+          style={{
+            width: `${width * (zoomLevel / 100)}px`,
+            height: `${height * (zoomLevel / 100)}px`,
+            transform: `translate(${canvasPan.x}px, ${canvasPan.y}px)`,
+            overflow: 'hidden'
+          }}
+        >
+          {renderGrid()}
+          
+          {renderHorizontalRuler()}
+          {renderVerticalRuler()}
+          
+          {!isLoading && templateElements && templateElements.map(element => {
+            const elementPosition = element.position as any;
+            const elementSize = element.size as any;
+            const elementProperties = element.properties as any;
+            
+            const elementStyle: React.CSSProperties = {
+              position: 'absolute',
+              left: `${elementPosition.x * (zoomLevel / 100)}px`,
+              top: `${elementPosition.y * (zoomLevel / 100)}px`,
+              width: `${elementSize.width * (zoomLevel / 100)}px`,
+              height: `${elementSize.height * (zoomLevel / 100)}px`,
+              transform: element.rotation ? `rotate(${element.rotation}deg)` : undefined,
+              cursor: 'move',
+              zIndex: element.layer || 0,
+              border: selectedElement === element.id ? '1px solid #0284c7' : 'none'
+            };
+            
+            return (
+              <div
+                key={element.id}
+                style={elementStyle}
+                onClick={(e) => handleElementClick(element.id, e)}
+                onMouseDown={(e) => handleDragStart(e, element.id)}
+                onDoubleClick={(e) => handleElementDoubleClick(element.id, element.type, e)}
+                className={cn(
+                  "select-none overflow-hidden",
+                  selectedElement === element.id ? 'ring-2 ring-blue-500 ring-opacity-50' : ''
+                )}
+              >
+                {element.type === 'text' && (
+                  <div 
+                    style={{
+                      fontFamily: elementProperties.fontFamily,
+                      fontSize: `${elementProperties.fontSize * (zoomLevel / 100)}px`,
+                      fontWeight: elementProperties.fontWeight,
+                      fontStyle: elementProperties.fontStyle,
+                      textAlign: elementProperties.textAlign,
+                      textDecoration: elementProperties.textDecoration,
+                      color: elementProperties.color,
+                      width: '100%',
+                      height: '100%',
+                      padding: '4px',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {elementProperties.content}
+                  </div>
+                )}
+                
+                {element.type === 'image' && (
+                  <img
+                    src={elementProperties.src}
+                    alt={element.name}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: elementProperties.objectFit || 'contain'
+                    }}
+                  />
+                )}
+                
+                {element.type === 'barcode' && (
+                  <div className="w-full h-full flex items-center justify-center">
+                    {elementProperties.barcodeType === 'qrcode' ? (
+                      <div 
+                        className="qrcode-placeholder bg-black/90"
+                        style={{width: '90%', height: '90%'}}
+                        title={elementProperties.content}
+                      >
+                        <div className="w-full h-full relative">
+                          <div className="absolute inset-3 border-4 border-white flex items-center justify-center">
+                            <div className="bg-white w-1/3 h-1/3 flex items-center justify-center text-[6px] text-black">
+                              QR
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div 
+                        className="barcode-placeholder bg-gradient-to-r from-black via-white to-black"
+                        style={{width: '100%', height: '50%'}}
+                        title={elementProperties.content}
+                      />
+                    )}
+                    {elementProperties.showText && (
+                      <div className="absolute bottom-0 text-center w-full text-xs">
+                        {elementProperties.content}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {renderResizeHandles(element.id)}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      
+      {showTextEditor && selectedElementData && selectedElementData.type === 'text' && (
+        <TextEditor
+          open={showTextEditor}
+          onOpenChange={setShowTextEditor}
+          initialText={(selectedElementData.properties as any)?.content || ''}
+          textProperties={(selectedElementData.properties as any) || {}}
+          onSave={handleSaveTextChanges}
+        />
+      )}
+      
+      {showImageUploader && (
+        <ImageUploader 
+          open={showImageUploader}
+          onOpenChange={setShowImageUploader}
+          onImageSelect={handleImageSelect}
+          templateId={templateId}
+        />
+      )}
+      
+      {showBarcodeEditor && (
+        <BarcodeEditor
+          open={showBarcodeEditor}
+          onOpenChange={setShowBarcodeEditor}
+          initialValue=""
+          onSave={handleBarcodeConfigured}
+        />
+      )}
+      
+      {isLoading && (
+        <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-50">
+          <p className="text-lg font-medium">Loading elements...</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Canvas;
