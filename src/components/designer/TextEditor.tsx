@@ -18,31 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-
-interface TextEditorProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSave: (textProperties: {
-    content: string;
-    fontFamily: string;
-    fontSize: number;
-    fontWeight: string;
-    fontStyle: string;
-    textAlign: string;
-    textDecoration: string;
-    color: string;
-  }) => void;
-  initialProperties?: {
-    content?: string;
-    fontFamily?: string;
-    fontSize?: number;
-    fontWeight?: string;
-    fontStyle?: string;
-    textAlign?: string;
-    textDecoration?: string;
-    color?: string;
-  };
-}
+import { TextEditorProps } from '@/types/designer';
 
 const FONT_FAMILIES = [
   'Arial', 
@@ -79,33 +55,34 @@ const TEXT_DECORATIONS = [
 const TextEditor: React.FC<TextEditorProps> = ({
   open,
   onOpenChange,
+  textProperties = {},
   onSave,
-  initialProperties = {}
+  content
 }) => {
-  const [content, setContent] = useState(initialProperties.content || 'Sample Text');
-  const [fontFamily, setFontFamily] = useState(initialProperties.fontFamily || 'Arial');
-  const [fontSize, setFontSize] = useState(initialProperties.fontSize || 16);
-  const [fontWeight, setFontWeight] = useState(initialProperties.fontWeight || 'normal');
-  const [fontStyle, setFontStyle] = useState(initialProperties.fontStyle || 'normal');
-  const [textAlign, setTextAlign] = useState(initialProperties.textAlign || 'left');
-  const [textDecoration, setTextDecoration] = useState(initialProperties.textDecoration || 'none');
-  const [color, setColor] = useState(initialProperties.color || '#000000');
+  const [textContent, setTextContent] = useState(content || textProperties.content || 'Sample Text');
+  const [fontFamily, setFontFamily] = useState(textProperties.fontFamily || 'Arial');
+  const [fontSize, setFontSize] = useState(textProperties.fontSize || 16);
+  const [fontWeight, setFontWeight] = useState(textProperties.fontWeight || 'normal');
+  const [fontStyle, setFontStyle] = useState(textProperties.fontStyle || 'normal');
+  const [textAlign, setTextAlign] = useState(textProperties.textAlign || 'left');
+  const [textDecoration, setTextDecoration] = useState(textProperties.textDecoration || 'none');
+  const [color, setColor] = useState(textProperties.color || '#000000');
 
-  // Update state when initialProperties change
+  // Update state when textProperties change
   useEffect(() => {
-    if (initialProperties.content) setContent(initialProperties.content);
-    if (initialProperties.fontFamily) setFontFamily(initialProperties.fontFamily);
-    if (initialProperties.fontSize) setFontSize(initialProperties.fontSize);
-    if (initialProperties.fontWeight) setFontWeight(initialProperties.fontWeight);
-    if (initialProperties.fontStyle) setFontStyle(initialProperties.fontStyle);
-    if (initialProperties.textAlign) setTextAlign(initialProperties.textAlign);
-    if (initialProperties.textDecoration) setTextDecoration(initialProperties.textDecoration);
-    if (initialProperties.color) setColor(initialProperties.color);
-  }, [initialProperties]);
+    if (textProperties.content) setTextContent(textProperties.content);
+    if (textProperties.fontFamily) setFontFamily(textProperties.fontFamily);
+    if (textProperties.fontSize) setFontSize(textProperties.fontSize);
+    if (textProperties.fontWeight) setFontWeight(textProperties.fontWeight);
+    if (textProperties.fontStyle) setFontStyle(textProperties.fontStyle);
+    if (textProperties.textAlign) setTextAlign(textProperties.textAlign);
+    if (textProperties.textDecoration) setTextDecoration(textProperties.textDecoration);
+    if (textProperties.color) setColor(textProperties.color);
+  }, [textProperties]);
 
   const handleSave = () => {
     onSave({
-      content,
+      content: textContent,
       fontFamily,
       fontSize,
       fontWeight,
@@ -128,8 +105,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
           <div className="space-y-2">
             <Label>Text Content</Label>
             <Textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
+              value={textContent}
+              onChange={(e) => setTextContent(e.target.value)}
               rows={3}
             />
           </div>
@@ -266,7 +243,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
               }}
               className="p-2 border rounded min-h-[60px]"
             >
-              {content || 'Sample Text'}
+              {textContent || 'Sample Text'}
             </div>
           </div>
         </div>

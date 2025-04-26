@@ -110,8 +110,7 @@ export interface PrintSettings {
 export interface TextEditorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  textProperties: any;
+  textProperties?: any;
   onSave: (textProperties: any) => void;
-  content?: string; // Optional prop for backward compatibility
+  content?: string; 
 }
-

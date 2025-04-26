@@ -1,10 +1,9 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 
-// Import our new components
+// Import our components
 import CanvasToolbar from './CanvasToolbar';
 import CanvasElement from './CanvasElement';
 import CanvasGrid from './CanvasGrid';
