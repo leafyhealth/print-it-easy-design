@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Dialog,
@@ -44,9 +45,9 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           if (!success) {
             setUploadError("Storage not available. Please try again later.");
             toast({
-              title: "Storage Setup Failed",
-              description: "Unable to setup storage for uploads. You can still use external image URLs.",
-              variant: "destructive"
+              title: "Storage Setup Notice",
+              description: "Using external images or placeholders instead. Local uploads unavailable.",
+              variant: "default"
             });
           } else {
             setUploadError(null);
@@ -58,9 +59,9 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
           console.error("Error setting up storage:", error);
           setUploadError("Storage setup failed");
           toast({
-            title: "Storage Error",
+            title: "Storage Notice",
             description: "Could not set up storage for uploads. You can still use external image URLs.",
-            variant: "destructive"
+            variant: "default"
           });
         }
       }
@@ -93,6 +94,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       setRecentImages(Array.from(imageUrls));
     } catch (error) {
       console.error('Error fetching recent images:', error);
+      toast({
+        title: "Couldn't Load Recent Images",
+        description: "Unable to retrieve your recently used images.",
+        variant: "default"
+      });
     }
   };
 

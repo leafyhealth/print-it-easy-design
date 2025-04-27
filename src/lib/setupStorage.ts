@@ -1,9 +1,18 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
 
 export async function setupStorageBucket() {
   try {
     console.log('Starting storage bucket setup...');
+    // First check if the user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.log('User not authenticated, cannot create bucket');
+      return false;
+    }
+    
     // Check if the bucket already exists
     const { data: buckets, error: getBucketsError } = await supabase.storage.listBuckets();
     
@@ -23,8 +32,19 @@ export async function setupStorageBucket() {
         });
         
         if (createBucketError) {
-          console.error('Error creating template_assets bucket:', createBucketError);
-          return false;
+          if (createBucketError.message.includes('row-level security policy')) {
+            // Handle RLS policy error gracefully
+            toast({
+              title: 'Storage Access Restricted',
+              description: 'Using placeholder images instead. Contact admin for storage access.',
+              variant: 'destructive'
+            });
+            console.error('RLS policy preventing bucket creation:', createBucketError);
+            return false;
+          } else {
+            console.error('Error creating template_assets bucket:', createBucketError);
+            return false;
+          }
         } else {
           console.log('Created template_assets bucket successfully');
           
@@ -86,6 +106,14 @@ export async function updateBucketPolicies() {
 export async function ensureStorageBucketExists() {
   try {
     console.log('Ensuring storage bucket exists...');
+    // First check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.log('Storage setup skipped - user not authenticated');
+      return false;
+    }
+    
     const result = await setupStorageBucket();
     console.log('Storage bucket setup complete');
     return result;
