@@ -8,49 +8,50 @@ import PaperTemplateSelector from '../components/designer/PaperTemplateSelector'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ensureStorageBucketExists } from '@/lib/setupStorage';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Loader2 } from 'lucide-react';
+
+// Skip storage bucket creation attempt since it's causing issues
+const skipStorageCreation = true;
 
 const DesignerPage = () => {
   const queryClient = useQueryClient();
   const [showPaperTemplateSelector, setShowPaperTemplateSelector] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
   const [user, setUser] = useState<any>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  // Check if user is authenticated and setup storage
+  // Check URL for template parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const templateId = urlParams.get('template');
+    if (templateId) {
+      setSelectedTemplateId(templateId);
+    }
+  }, []);
+
+  // Check if user is authenticated
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      
-      // If user is logged in but no template is selected, show the paper template dialog
-      if (user && !selectedTemplateId) {
-        setShowPaperTemplateSelector(true);
-      }
-      
-      // Setup storage bucket
-      if (user) {
-        // Force bucket creation on every page load to ensure it exists
-        try {
-          const bucketSetup = await ensureStorageBucketExists();
-          if (bucketSetup) {
-            console.log('Storage bucket is ready for use');
-          } else {
-            toast({
-              title: 'Storage Setup Issue',
-              description: 'There was a problem setting up storage. Some features may not work properly.',
-              variant: 'destructive'
-            });
-          }
-        } catch (error) {
-          console.error('Error setting up storage bucket:', error);
-          toast({
-            title: 'Storage Setup Error',
-            description: 'Failed to set up the storage bucket. Please try again later.',
-            variant: 'destructive'
-          });
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+        
+        // If user is logged in but no template is selected, show the paper template dialog
+        if (user && !selectedTemplateId) {
+          setShowPaperTemplateSelector(true);
         }
+        
+        setIsInitializing(false);
+      } catch (error) {
+        console.error('Error checking authentication:', error);
+        setIsInitializing(false);
+        toast({
+          title: 'Authentication Error',
+          description: 'Failed to check your login status. Please try again.',
+          variant: 'destructive'
+        });
       }
     };
 
@@ -60,9 +61,6 @@ const DesignerPage = () => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setUser(session?.user || null);
-        if (session?.user) {
-          await ensureStorageBucketExists();
-        }
       }
     );
 
@@ -72,25 +70,32 @@ const DesignerPage = () => {
   }, [selectedTemplateId]);
 
   // Fetch templates
-  const { data: templates, isLoading } = useQuery({
+  const { data: templates, isLoading: isLoadingTemplates, error: templatesError } = useQuery({
     queryKey: ['templates'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('templates')
-        .select('*')
-        .order('created_at', { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from('templates')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (error) {
+        if (error) {
+          throw error;
+        }
+
+        return data || [];
+      } catch (error: any) {
+        console.error('Error fetching templates:', error);
         toast({
           title: 'Error fetching templates',
-          description: error.message,
+          description: error.message || 'Failed to load templates',
           variant: 'destructive'
         });
         return [];
       }
-
-      return data || [];
-    }
+    },
+    retry: 3, // Retry failed requests up to 3 times
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff
   });
 
   // Create a new template with advanced paper configuration
@@ -116,8 +121,7 @@ const DesignerPage = () => {
         throw new Error('You must be logged in to create a template');
       }
 
-      // We'll save the template with the width and height in pixels
-      // For unit conversion: 1 inch = 96px, 1mm = 3.78px (approximation)
+      // Unit conversion
       let widthInPixels = templateSettings.labelWidth;
       let heightInPixels = templateSettings.labelHeight;
       let horizontalGapPx = templateSettings.horizontalGap || 0;
@@ -196,7 +200,6 @@ const DesignerPage = () => {
       const elementType = customEvent.detail.type;
       
       // The logic to add specific element types is in Canvas.tsx
-      // So we trigger the appropriate method there
       switch (elementType) {
         case 'text':
           document.dispatchEvent(new CustomEvent('add-text-element'));
@@ -220,6 +223,41 @@ const DesignerPage = () => {
     };
   }, []);
 
+  // Show error state if templates failed to load
+  if (templatesError) {
+    return (
+      <div className="flex flex-col h-screen">
+        <Header />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center p-6 max-w-md">
+            <h2 className="text-xl font-bold mb-2">Error Loading Templates</h2>
+            <p className="text-gray-600 mb-4">Failed to load templates. Please try again later.</p>
+            <Button onClick={() => queryClient.invalidateQueries({ queryKey: ['templates'] })}>
+              Retry
+            </Button>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  // If initializing, show loading screen
+  if (isInitializing) {
+    return (
+      <div className="flex flex-col h-screen">
+        <Header />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex flex-col items-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+            <p className="text-lg font-medium">Initializing...</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen">
       <Header />
@@ -233,12 +271,22 @@ const DesignerPage = () => {
           />
         </div>
         <div className="flex-1 overflow-hidden">
-          <Canvas 
-            width={templates?.find(t => t.id === selectedTemplateId)?.width || 600}
-            height={templates?.find(t => t.id === selectedTemplateId)?.height || 400}
-            showGrid={true} 
-            templateId={selectedTemplateId}
-          />
+          {selectedTemplateId ? (
+            <Canvas 
+              width={templates?.find(t => t.id === selectedTemplateId)?.width || 600}
+              height={templates?.find(t => t.id === selectedTemplateId)?.height || 400}
+              showGrid={true} 
+              templateId={selectedTemplateId}
+            />
+          ) : (
+            <div className="h-full flex items-center justify-center bg-gray-100">
+              <div className="text-center p-6">
+                <h2 className="text-2xl font-bold mb-2">Welcome to PrintEasy</h2>
+                <p className="text-gray-600 mb-4">Select a template or create a new one to get started.</p>
+                <Button onClick={() => setShowPaperTemplateSelector(true)}>Create New Template</Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <Footer />
@@ -250,10 +298,11 @@ const DesignerPage = () => {
         onConfirm={(templateSettings) => createTemplateMutation.mutate(templateSettings)}
       />
 
-      {isLoading && (
+      {isLoadingTemplates && selectedTemplateId && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded-md shadow-lg">
-            Loading templates...
+          <div className="bg-white p-6 rounded-md shadow-lg flex items-center space-x-3">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span>Loading templates...</span>
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { Loader2 } from 'lucide-react';
 
 // Import our components
 import CanvasToolbar from './CanvasToolbar';
@@ -52,29 +53,35 @@ const Canvas: React.FC<CanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [panStartPos, setPanStartPos] = useState({ x: 0, y: 0 });
 
-  const { data: template, isLoading: isTemplateLoading } = useQuery({
+  const { data: template, isLoading: isTemplateLoading, error: templateError } = useQuery({
     queryKey: ['template', templateId],
     queryFn: async () => {
       if (!templateId) return null;
       
-      const { data, error } = await supabase
-        .from('templates')
-        .select('*')
-        .eq('id', templateId)
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('templates')
+          .select('*')
+          .eq('id', templateId)
+          .single();
 
-      if (error) {
+        if (error) {
+          throw error;
+        }
+
+        return data;
+      } catch (error: any) {
+        console.error('Error fetching template:', error);
         toast({
-          title: 'Error fetching template',
-          description: error.message,
+          title: 'Error loading template',
+          description: error.message || 'Failed to load template details',
           variant: 'destructive'
         });
         return null;
       }
-
-      return data;
     },
-    enabled: !!templateId
+    enabled: !!templateId,
+    retry: 2
   });
 
   const gridSettings: GridSettings = template?.grid_settings ? 
@@ -83,29 +90,102 @@ const Canvas: React.FC<CanvasProps> = ({
       : template.grid_settings as unknown as GridSettings) 
     : { showGrid: true, gridSize: 10 };
 
-  const { data: templateElements, isLoading } = useQuery({
+  const { data: templateElements, isLoading: isElementsLoading, error: elementsError } = useQuery({
     queryKey: ['template-elements', templateId],
     queryFn: async () => {
       if (!templateId) return [];
       
-      const { data, error } = await supabase
-        .from('template_elements')
-        .select('*')
-        .eq('template_id', templateId);
+      try {
+        const { data, error } = await supabase
+          .from('template_elements')
+          .select('*')
+          .eq('template_id', templateId);
 
-      if (error) {
+        if (error) {
+          throw error;
+        }
+
+        return data || [];
+      } catch (error: any) {
+        console.error('Error fetching template elements:', error);
         toast({
-          title: 'Error fetching template elements',
-          description: error.message,
+          title: 'Error loading elements',
+          description: error.message || 'Failed to load template elements',
           variant: 'destructive'
         });
         return [];
       }
-
-      return data || [];
     },
-    enabled: !!templateId
+    enabled: !!templateId,
+    retry: 2
   });
+
+  const isLoading = isTemplateLoading || isElementsLoading;
+  const hasError = templateError || elementsError;
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-full">
+        <CanvasToolbar
+          onAddText={handleAddTextElement}
+          onAddImage={handleAddImageElement}
+          onAddBarcode={handleAddBarcodeElement}
+          onDeleteElement={handleDeleteElement}
+          hasSelectedElement={!!selectedElement}
+          showRulers={showRulers}
+          onToggleRulers={() => setShowRulers(!showRulers)}
+          showGrid={showGridState}
+          onToggleGrid={() => setShowGridState(!showGridState)}
+          zoomLevel={zoomLevel}
+          onZoomIn={() => setZoomLevel(Math.min(500, zoomLevel + 10))}
+          onZoomOut={() => setZoomLevel(Math.max(25, zoomLevel - 10))}
+          onZoomFit={handleZoomFit}
+          onZoomObjects={handleZoomObjects}
+        />
+        <div className="relative flex-1 overflow-auto bg-gray-300 flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center bg-white p-8 rounded-lg shadow-lg">
+            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+            <p className="text-lg font-medium">Loading template...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="flex flex-col h-full">
+        <CanvasToolbar
+          onAddText={handleAddTextElement}
+          onAddImage={handleAddImageElement}
+          onAddBarcode={handleAddBarcodeElement}
+          onDeleteElement={handleDeleteElement}
+          hasSelectedElement={!!selectedElement}
+          showRulers={showRulers}
+          onToggleRulers={() => setShowRulers(!showRulers)}
+          showGrid={showGridState}
+          onToggleGrid={() => setShowGridState(!showGridState)}
+          zoomLevel={zoomLevel}
+          onZoomIn={() => setZoomLevel(Math.min(500, zoomLevel + 10))}
+          onZoomOut={() => setZoomLevel(Math.max(25, zoomLevel - 10))}
+          onZoomFit={handleZoomFit}
+          onZoomObjects={handleZoomObjects}
+        />
+        <div className="relative flex-1 overflow-auto bg-gray-300 flex items-center justify-center">
+          <div className="bg-white p-8 rounded-lg shadow-lg max-w-md">
+            <h3 className="text-xl font-bold mb-2 text-red-600">Error Loading Template</h3>
+            <p className="mb-4">There was a problem loading the template or its elements.</p>
+            <Button onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['template', templateId] });
+              queryClient.invalidateQueries({ queryKey: ['template-elements', templateId] });
+            }}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const selectedElementData = templateElements?.find(
     (element) => element.id === selectedElement
