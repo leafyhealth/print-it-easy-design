@@ -8,34 +8,34 @@ import { Input } from '@/components/ui/input';
 import { Link } from 'react-router-dom';
 
 const TemplatesPage = () => {
-  // Mock data for templates
+  // Mock data for templates with Unsplash images
   const templates = [
     { 
       id: 1, 
       name: 'Shipping Label', 
       description: 'Standard shipping label with barcode', 
-      thumbnail: 'https://via.placeholder.com/150?text=Shipping',
+      thumbnail: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=150&q=80',
       lastModified: '3 days ago'
     },
     { 
       id: 2, 
       name: 'Product Tag', 
       description: 'Small product tag with price and barcode', 
-      thumbnail: 'https://via.placeholder.com/150?text=Product',
+      thumbnail: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=150&q=80',
       lastModified: '1 week ago'
     },
     { 
       id: 3, 
       name: 'Return Label', 
       description: 'Return shipping label with instructions', 
-      thumbnail: 'https://via.placeholder.com/150?text=Return',
+      thumbnail: 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?auto=format&fit=crop&w=150&q=80',
       lastModified: '2 weeks ago'
     },
     { 
       id: 4, 
       name: 'Address Label', 
       description: 'Simple address label', 
-      thumbnail: 'https://via.placeholder.com/150?text=Address',
+      thumbnail: 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&w=150&q=80',
       lastModified: '1 month ago'
     },
   ];

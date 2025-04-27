@@ -9,8 +9,9 @@ interface PlaceholderUploaderProps {
 }
 
 const PlaceholderUploader: React.FC<PlaceholderUploaderProps> = ({ onImageSelect, onClose }) => {
-  // Using an Unsplash image instead of via.placeholder.com to avoid the ERR_NAME_NOT_RESOLVED error
+  // Using an Unsplash image to avoid the ERR_NAME_NOT_RESOLVED error
   const handlePlaceholderImage = () => {
+    // Use a reliable image from Unsplash instead of via.placeholder.com
     const placeholderUrl = "https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&w=300&h=200&q=80";
     onImageSelect(placeholderUrl);
     onClose();

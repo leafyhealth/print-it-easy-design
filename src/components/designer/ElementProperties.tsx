@@ -2,20 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/components/ui/use-toast';
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from '@/components/ui/card';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -23,13 +17,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from '@/components/ui/tabs';
+import { 
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { 
+  ChevronDown, 
+  ChevronUp
+} from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 
+// Define types for the element data
 interface ElementPosition {
   x: number;
   y: number;
@@ -45,89 +54,95 @@ interface ElementProperties {
 }
 
 interface ElementData {
-  id: string;
-  name: string;
-  type: string;
-  position: ElementPosition;
-  size: ElementSize;
-  properties: ElementProperties;
+  id?: string;
+  name?: string;
+  type?: string;
+  position?: ElementPosition;
+  size?: ElementSize;
+  properties?: ElementProperties;
   rotation?: number;
   layer?: number;
   template_id?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 const ElementProperties = () => {
   const queryClient = useQueryClient();
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('style');
-
+  const [activeTab, setActiveTab] = useState('basic');
+  const [accordionOpen, setAccordionOpen] = useState<{[key: string]: boolean}>({
+    position: true,
+    size: true,
+    basic: true,
+    advanced: false,
+  });
+  
   // Listen for element selection events
   useEffect(() => {
     const handleElementSelected = (event: Event) => {
       const customEvent = event as CustomEvent;
-      const elementId = customEvent.detail?.elementId;
-      setSelectedElementId(elementId);
+      setSelectedElementId(customEvent.detail.elementId || null);
+      setActiveTab('basic');
     };
-
-    const handleElementDeselected = () => {
-      setSelectedElementId(null);
-    };
-
+    
     document.addEventListener('element-selected', handleElementSelected);
-    document.addEventListener('element-deselected', handleElementDeselected);
-
+    
     return () => {
       document.removeEventListener('element-selected', handleElementSelected);
-      document.removeEventListener('element-deselected', handleElementDeselected);
     };
   }, []);
-
-  // Fetch selected element details
+  
+  // Fetch element data from Supabase
   const { data: elementData, isLoading } = useQuery({
     queryKey: ['element', selectedElementId],
     queryFn: async () => {
       if (!selectedElementId) return null;
-
+      
       try {
         const { data, error } = await supabase
           .from('template_elements')
           .select('*')
           .eq('id', selectedElementId)
           .single();
-
+          
         if (error) {
-          toast({
-            title: 'Error loading element',
-            description: error.message,
-            variant: 'destructive'
-          });
+          console.error('Error fetching element:', error);
           throw error;
         }
 
-        return data as ElementData;
+        // Convert JSON strings to objects if needed
+        const processedData: ElementData = { ...data };
+        
+        if (typeof data.position === 'string') {
+          processedData.position = JSON.parse(data.position);
+        }
+        
+        if (typeof data.size === 'string') {
+          processedData.size = JSON.parse(data.size);
+        }
+        
+        if (typeof data.properties === 'string') {
+          processedData.properties = JSON.parse(data.properties);
+        }
+        
+        return processedData;
       } catch (error: any) {
         console.error('Error fetching element:', error);
         return null;
       }
     },
-    enabled: !!selectedElementId
+    enabled: !!selectedElementId,
   });
-
-  // Update element properties mutation
+  
+  // Mutation for updating element properties
   const updateElementMutation = useMutation({
     mutationFn: async ({ 
       elementId, 
       updates 
     }: { 
       elementId: string; 
-      updates: Partial<{
-        properties: ElementProperties;
-        position: ElementPosition;
-        size: ElementSize;
-        name: string;
-        rotation?: number;
-        layer?: number;
-      }>;
+      updates: ElementData;
     }) => {
       const { data, error } = await supabase
         .from('template_elements')
@@ -135,462 +150,362 @@ const ElementProperties = () => {
         .eq('id', elementId)
         .select()
         .single();
-
+        
       if (error) {
-        toast({
-          title: 'Failed to update element',
-          description: error.message,
-          variant: 'destructive'
-        });
+        console.error('Error updating element:', error);
         throw error;
       }
 
-      return data as ElementData;
+      // Convert JSON strings to objects for the returned data
+      const processedData: ElementData = { ...data };
+        
+      if (typeof data.position === 'string') {
+        processedData.position = JSON.parse(data.position);
+      }
+      
+      if (typeof data.size === 'string') {
+        processedData.size = JSON.parse(data.size);
+      }
+      
+      if (typeof data.properties === 'string') {
+        processedData.properties = JSON.parse(data.properties);
+      }
+      
+      return processedData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['element', selectedElementId] });
-      queryClient.invalidateQueries({ queryKey: ['template-elements'] });
-      toast({
-        title: 'Element updated',
-        description: 'Properties have been saved'
-      });
+      document.dispatchEvent(new CustomEvent('element-updated', {
+        detail: { elementId: selectedElementId }
+      }));
+    },
+    onError: (error) => {
+      console.error('Error updating element:', error);
     }
   });
 
-  // Handle property changes
+  // Update a specific property
   const updateProperty = (propertyName: string, value: any) => {
     if (!selectedElementId || !elementData) return;
     
-    const properties: ElementProperties = typeof elementData.properties === 'string' 
-      ? JSON.parse(elementData.properties) 
-      : { ...elementData.properties };
+    const properties: ElementProperties = { 
+      ...((typeof elementData.properties === 'string') 
+        ? JSON.parse(elementData.properties) 
+        : (elementData.properties || {}))
+    };
     
     properties[propertyName] = value;
     
-    updateElementMutation.mutate({
-      elementId: selectedElementId,
-      updates: { properties }
+    updateElementMutation.mutate({ 
+      elementId: selectedElementId, 
+      updates: { properties } 
     });
   };
-
+  
+  // Update position
   const updatePosition = (axis: 'x' | 'y', value: number) => {
     if (!selectedElementId || !elementData) return;
     
-    const position: ElementPosition = typeof elementData.position === 'string' 
-      ? JSON.parse(elementData.position) 
-      : { ...elementData.position };
+    const position: ElementPosition = { 
+      ...((typeof elementData.position === 'string') 
+        ? JSON.parse(elementData.position) 
+        : (elementData.position || { x: 0, y: 0 }))
+    };
     
     position[axis] = value;
     
-    updateElementMutation.mutate({
-      elementId: selectedElementId,
-      updates: { position }
+    updateElementMutation.mutate({ 
+      elementId: selectedElementId, 
+      updates: { position } 
     });
   };
-
+  
+  // Update size
   const updateSize = (dimension: 'width' | 'height', value: number) => {
     if (!selectedElementId || !elementData) return;
     
-    const size: ElementSize = typeof elementData.size === 'string' 
-      ? JSON.parse(elementData.size) 
-      : { ...elementData.size };
+    const size: ElementSize = { 
+      ...((typeof elementData.size === 'string') 
+        ? JSON.parse(elementData.size) 
+        : (elementData.size || { width: 100, height: 100 }))
+    };
     
     size[dimension] = value;
     
-    updateElementMutation.mutate({
-      elementId: selectedElementId,
-      updates: { size }
+    updateElementMutation.mutate({ 
+      elementId: selectedElementId, 
+      updates: { size } 
     });
   };
-
-  const updateName = (name: string) => {
+  
+  // Update element name
+  const updateElementName = (name: string) => {
     if (!selectedElementId) return;
     
-    updateElementMutation.mutate({
-      elementId: selectedElementId,
-      updates: { name }
+    updateElementMutation.mutate({ 
+      elementId: selectedElementId, 
+      updates: { name } 
     });
   };
 
-  // Parse element properties
-  const elementProperties: ElementProperties = elementData?.properties 
-    ? (typeof elementData.properties === 'string' 
-        ? JSON.parse(elementData.properties) 
-        : elementData.properties)
-    : {};
-  
-  const elementPosition: ElementPosition = elementData?.position
-    ? (typeof elementData.position === 'string'
-        ? JSON.parse(elementData.position)
-        : elementData.position)
-    : { x: 0, y: 0 };
+  // Get parsed properties
+  const getElementProperties = (): ElementProperties => {
+    if (!elementData) return {};
     
-  const elementSize: ElementSize = elementData?.size
-    ? (typeof elementData.size === 'string'
-        ? JSON.parse(elementData.size)
-        : elementData.size)
-    : { width: 100, height: 100 };
+    return (typeof elementData.properties === 'string') 
+      ? JSON.parse(elementData.properties) 
+      : (elementData.properties || {});
+  };
+  
+  // Get parsed position
+  const getElementPosition = (): ElementPosition => {
+    if (!elementData) return { x: 0, y: 0 };
+    
+    return (typeof elementData.position === 'string')
+      ? JSON.parse(elementData.position)
+      : (elementData.position || { x: 0, y: 0 });
+  };
+  
+  // Get parsed size
+  const getElementSize = (): ElementSize => {
+    if (!elementData) return { width: 100, height: 100 };
+    
+    return (typeof elementData.size === 'string')
+      ? JSON.parse(elementData.size)
+      : (elementData.size || { width: 100, height: 100 });
+  };
 
   if (!selectedElementId) {
     return (
-      <Card className="w-full">
-        <CardContent className="pt-6 text-center text-gray-500">
-          <p>Select an element to edit its properties</p>
-        </CardContent>
-      </Card>
+      <div className="p-4 text-center text-gray-500">
+        Select an element to view and edit its properties
+      </div>
     );
   }
-
+  
   if (isLoading) {
     return (
-      <Card className="w-full">
-        <CardContent className="pt-6 flex justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center p-4">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
     );
   }
-
+  
   if (!elementData) {
     return (
-      <Card className="w-full">
-        <CardContent className="pt-6 text-center text-gray-500">
-          <p>Failed to load element properties</p>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="mt-2"
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['element', selectedElementId] })}
-          >
-            Retry
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="p-4 text-center text-red-500">
+        Error loading element data. Please try again.
+      </div>
     );
   }
-
+  
+  const elementProperties = getElementProperties();
+  const elementPosition = getElementPosition();
+  const elementSize = getElementSize();
+  
   return (
-    <Card className="w-full">
-      <CardHeader className="py-3">
-        <CardTitle className="text-lg flex justify-between items-center">
-          <Input
-            value={elementData.name}
-            onChange={(e) => updateName(e.target.value)}
-            className="h-7 text-base font-medium"
-          />
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="py-2">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-3 mb-4">
-            <TabsTrigger value="style">Style</TabsTrigger>
-            <TabsTrigger value="position">Position</TabsTrigger>
-            <TabsTrigger value="data">Data</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="style" className="space-y-4">
+    <div className="h-full overflow-y-auto p-1 text-sm">
+      <Card className="mb-2">
+        <CardHeader className="py-3">
+          <CardTitle className="text-md">Element Properties</CardTitle>
+        </CardHeader>
+        <CardContent className="py-2">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="elementName">Name</Label>
+              <Input 
+                id="elementName" 
+                value={elementData.name || ''} 
+                onChange={(e) => updateElementName(e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <Label>Type</Label>
+              <div className="text-gray-600 mt-1">{elementData.type}</div>
+            </div>
+            
+            <Collapsible 
+              open={accordionOpen.position} 
+              onOpenChange={(isOpen) => setAccordionOpen({...accordionOpen, position: isOpen})}
+              className="border rounded-md p-2"
+            >
+              <div className="flex justify-between items-center">
+                <CollapsibleTrigger className="flex items-center text-sm font-medium hover:underline">
+                  Position
+                  {accordionOpen.position ? 
+                    <ChevronUp className="h-4 w-4 ml-1" /> : 
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  }
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent className="pt-2 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label htmlFor="posX">X</Label>
+                    <Input 
+                      id="posX" 
+                      type="number" 
+                      value={elementPosition.x} 
+                      onChange={(e) => updatePosition('x', Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="posY">Y</Label>
+                    <Input 
+                      id="posY" 
+                      type="number" 
+                      value={elementPosition.y} 
+                      onChange={(e) => updatePosition('y', Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+            
+            <Collapsible 
+              open={accordionOpen.size} 
+              onOpenChange={(isOpen) => setAccordionOpen({...accordionOpen, size: isOpen})}
+              className="border rounded-md p-2"
+            >
+              <div className="flex justify-between items-center">
+                <CollapsibleTrigger className="flex items-center text-sm font-medium hover:underline">
+                  Size
+                  {accordionOpen.size ? 
+                    <ChevronUp className="h-4 w-4 ml-1" /> : 
+                    <ChevronDown className="h-4 w-4 ml-1" />
+                  }
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent className="pt-2 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label htmlFor="width">Width</Label>
+                    <Input 
+                      id="width" 
+                      type="number" 
+                      value={elementSize.width} 
+                      onChange={(e) => updateSize('width', Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="height">Height</Label>
+                    <Input 
+                      id="height" 
+                      type="number" 
+                      value={elementSize.height} 
+                      onChange={(e) => updateSize('height', Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          
+            {/* Type-specific properties */}
             {elementData.type === 'text' && (
               <>
-                <div className="space-y-2">
-                  <Label>Text Content</Label>
-                  <Input
-                    value={elementProperties.content || ''}
-                    onChange={(e) => updateProperty('content', e.target.value)}
+                <div>
+                  <Label htmlFor="text">Text Content</Label>
+                  <Input 
+                    id="text" 
+                    value={elementProperties.text || ''} 
+                    onChange={(e) => updateProperty('text', e.target.value)}
                   />
                 </div>
-
-                <div className="space-y-2">
-                  <Label>Font Family</Label>
-                  <Select
-                    value={elementProperties.fontFamily || 'Arial'}
+                <div>
+                  <Label htmlFor="fontSize">Font Size</Label>
+                  <Input 
+                    id="fontSize" 
+                    type="number" 
+                    value={elementProperties.fontSize || 16} 
+                    onChange={(e) => updateProperty('fontSize', Number(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="fontFamily">Font Family</Label>
+                  <Select 
+                    value={elementProperties.fontFamily || 'Arial'} 
                     onValueChange={(value) => updateProperty('fontFamily', value)}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
+                    <SelectTrigger id="fontFamily">
+                      <SelectValue placeholder="Select font" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Arial">Arial</SelectItem>
                       <SelectItem value="Helvetica">Helvetica</SelectItem>
                       <SelectItem value="Times New Roman">Times New Roman</SelectItem>
                       <SelectItem value="Courier New">Courier New</SelectItem>
-                      <SelectItem value="Georgia">Georgia</SelectItem>
-                      <SelectItem value="Verdana">Verdana</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="space-y-2">
-                  <Label>Font Size: {elementProperties.fontSize || 16}px</Label>
-                  <Slider
-                    value={[elementProperties.fontSize || 16]}
-                    min={8}
-                    max={72}
-                    step={1}
-                    onValueChange={(value) => updateProperty('fontSize', value[0])}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Text Color</Label>
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      type="color"
-                      value={elementProperties.color || '#000000'}
-                      onChange={(e) => updateProperty('color', e.target.value)}
-                      className="w-12 h-8 p-1"
-                    />
-                    <Input
-                      type="text"
-                      value={elementProperties.color || '#000000'}
-                      onChange={(e) => updateProperty('color', e.target.value)}
-                      className="flex-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Text Alignment</Label>
-                    <Select
-                      value={elementProperties.textAlign || 'left'}
-                      onValueChange={(value) => updateProperty('textAlign', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="left">Left</SelectItem>
-                        <SelectItem value="center">Center</SelectItem>
-                        <SelectItem value="right">Right</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Font Weight</Label>
-                    <Select
-                      value={elementProperties.fontWeight || 'normal'}
-                      onValueChange={(value) => updateProperty('fontWeight', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="normal">Normal</SelectItem>
-                        <SelectItem value="bold">Bold</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
               </>
             )}
-
+            
             {elementData.type === 'image' && (
-              <>
-                <div className="space-y-2">
-                  <Label>Image Source</Label>
-                  <Input
-                    value={elementProperties.src || ''}
-                    onChange={(e) => updateProperty('src', e.target.value)}
-                    disabled
-                  />
-                  <p className="text-xs text-gray-500">Double-click on the image to change it</p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Object Fit</Label>
-                  <Select
-                    value={elementProperties.objectFit || 'contain'}
-                    onValueChange={(value) => updateProperty('objectFit', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="contain">Contain</SelectItem>
-                      <SelectItem value="cover">Cover</SelectItem>
-                      <SelectItem value="fill">Fill</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
+              <div>
+                <Label htmlFor="src">Image Source</Label>
+                <Input 
+                  id="src" 
+                  value={elementProperties.src || ''} 
+                  onChange={(e) => updateProperty('src', e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">Enter image URL or use the element uploader</p>
+              </div>
             )}
-
+            
             {elementData.type === 'barcode' && (
               <>
-                <div className="space-y-2">
-                  <Label>Barcode Type</Label>
-                  <Input
-                    value={elementProperties.type || 'CODE128'}
-                    disabled
-                  />
+                <div>
+                  <Label htmlFor="barcodeType">Barcode Type</Label>
+                  <Select 
+                    value={elementProperties.barcodeType || 'code128'} 
+                    onValueChange={(value) => updateProperty('barcodeType', value)}
+                  >
+                    <SelectTrigger id="barcodeType">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="code128">Code 128</SelectItem>
+                      <SelectItem value="code39">Code 39</SelectItem>
+                      <SelectItem value="ean13">EAN-13</SelectItem>
+                      <SelectItem value="qrcode">QR Code</SelectItem>
+                      <SelectItem value="datamatrix">Data Matrix</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                
-                <div className="space-y-2">
-                  <Label>Barcode Value</Label>
-                  <Input
-                    value={elementProperties.value || ''}
+                <div>
+                  <Label htmlFor="value">Barcode Value</Label>
+                  <Input 
+                    id="value" 
+                    value={elementProperties.value || ''} 
                     onChange={(e) => updateProperty('value', e.target.value)}
                   />
                 </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="show-text"
-                    checked={elementProperties.displayValue || false}
-                    onCheckedChange={(checked) => updateProperty('displayValue', checked)}
-                  />
-                  <Label htmlFor="show-text">Display Value</Label>
-                </div>
               </>
             )}
-          </TabsContent>
-
-          <TabsContent value="position" className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>X Position: {elementPosition.x}px</Label>
-                <Input
-                  type="number"
-                  value={elementPosition.x}
-                  onChange={(e) => updatePosition('x', Number(e.target.value))}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Y Position: {elementPosition.y}px</Label>
-                <Input
-                  type="number"
-                  value={elementPosition.y}
-                  onChange={(e) => updatePosition('y', Number(e.target.value))}
-                />
-              </div>
-            </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Width: {elementSize.width}px</Label>
-                <Input
-                  type="number"
-                  value={elementSize.width}
-                  onChange={(e) => updateSize('width', Number(e.target.value))}
-                  min={10}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Height: {elementSize.height}px</Label>
-                <Input
-                  type="number"
-                  value={elementSize.height}
-                  onChange={(e) => updateSize('height', Number(e.target.value))}
-                  min={10}
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Rotation: {elementData.rotation || 0}°</Label>
-              <Slider
-                value={[elementData.rotation || 0]}
-                min={0}
-                max={360}
-                step={1}
-                onValueChange={(value) => {
-                  updateElementMutation.mutate({
-                    elementId: selectedElementId,
-                    updates: { rotation: value[0] }
-                  });
-                }}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Layer: {elementData.layer || 0}</Label>
-              <Input
-                type="number"
-                value={elementData.layer || 0}
-                onChange={(e) => {
-                  updateElementMutation.mutate({
-                    elementId: selectedElementId,
-                    updates: { layer: Number(e.target.value) }
-                  });
-                }}
-                min={0}
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="data" className="space-y-4">
-            <div className="space-y-2">
-              <Label>Dynamic Data Field</Label>
-              <Select
-                value={elementProperties.dataField || 'none'}
-                onValueChange={(value) => updateProperty('dataField', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="No data binding" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No data binding</SelectItem>
-                  <SelectItem value="firstName">First Name</SelectItem>
-                  <SelectItem value="lastName">Last Name</SelectItem>
-                  <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="phone">Phone</SelectItem>
-                  <SelectItem value="address">Address</SelectItem>
-                  <SelectItem value="city">City</SelectItem>
-                  <SelectItem value="state">State</SelectItem>
-                  <SelectItem value="zipCode">Zip Code</SelectItem>
-                  <SelectItem value="productId">Product ID</SelectItem>
-                  <SelectItem value="sku">SKU</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500">
-                Bind this element to a data field for batch printing
-              </p>
-            </div>
-            
-            {elementProperties.dataField && elementProperties.dataField !== 'none' && (
-              <div className="space-y-2">
-                <Label>Preview Value</Label>
-                <Input
-                  value={elementProperties.dataPreview || `{${elementProperties.dataField}}`}
-                  onChange={(e) => updateProperty('dataPreview', e.target.value)}
-                />
-                <p className="text-xs text-gray-500">
-                  This value is used for preview only
-                </p>
+            {elementData.type === 'shape' && (
+              <div>
+                <Label htmlFor="shapeType">Shape Type</Label>
+                <Select 
+                  value={elementProperties.shapeType || 'rectangle'} 
+                  onValueChange={(value) => updateProperty('shapeType', value)}
+                >
+                  <SelectTrigger id="shapeType">
+                    <SelectValue placeholder="Select shape" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="rectangle">Rectangle</SelectItem>
+                    <SelectItem value="ellipse">Ellipse</SelectItem>
+                    <SelectItem value="line">Line</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             )}
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-      
-      <CardFooter className="flex justify-between pt-2 pb-3">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => setSelectedElementId(null)}
-        >
-          Deselect
-        </Button>
-        <Button 
-          variant="destructive" 
-          size="sm" 
-          onClick={() => {
-            if (selectedElementId) {
-              const event = new CustomEvent('delete-element', {
-                detail: { elementId: selectedElementId }
-              });
-              document.dispatchEvent(event);
-              setSelectedElementId(null);
-            }
-          }}
-        >
-          Delete Element
-        </Button>
-      </CardFooter>
-    </Card>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

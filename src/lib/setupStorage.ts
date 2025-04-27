@@ -11,6 +11,9 @@ export const setupStorageBucket = async (): Promise<boolean> => {
   console.log('Starting storage bucket setup...');
   
   try {
+    // Mark setup as attempted to avoid multiple attempts
+    sessionStorage.setItem('storage-setup-attempted', 'true');
+    
     // Check if user is authenticated
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -29,30 +32,27 @@ export const setupStorageBucket = async (): Promise<boolean> => {
     
     // Create the bucket if it doesn't exist
     console.log('Bucket not found, creating template_assets bucket...');
-    try {
-      const { data, error: createBucketError } = await supabase.storage
-        .createBucket('template_assets', {
-          public: true,
-          fileSizeLimit: 5242880, // 5MB
-        });
-        
-      if (createBucketError) {
-        if (createBucketError.message.includes('row-level security policy')) {
-          // Handle RLS policy error gracefully
-          console.log('RLS policy preventing bucket creation - using fallback images');
-          return true; // Return true so the app can continue with placeholder images
-        } else {
-          console.error('Error creating template_assets bucket:', createBucketError);
-          return false;
-        }
-      }
+    
+    const { data, error: createBucketError } = await supabase.storage
+      .createBucket('template_assets', {
+        public: true,
+        fileSizeLimit: 5242880, // 5MB
+      });
       
-      console.log('Storage bucket created successfully');
-      return true;
-    } catch (err) {
-      console.error('Exception creating bucket:', err);
-      return false;
+    if (createBucketError) {
+      console.log('Error creating bucket:', createBucketError.message);
+      // Handle RLS policy error gracefully
+      if (createBucketError.message.includes('policy')) {
+        console.log('RLS policy preventing bucket creation - using fallback images');
+        return true; // Return true so the app can continue with placeholder images
+      } else {
+        console.error('Error creating template_assets bucket:', createBucketError);
+        return false;
+      }
     }
+    
+    console.log('Storage bucket created successfully');
+    return true;
   } catch (error) {
     console.error('Error setting up storage bucket:', error);
     return false;
@@ -66,20 +66,11 @@ export const setupStorageBucket = async (): Promise<boolean> => {
  * This function is more lightweight than setupStorageBucket and just ensures the bucket exists
  */
 export const ensureStorageBucketExists = async (): Promise<boolean> => {
-  console.log('Ensuring storage bucket exists...');
-  
-  try {
-    // Skip if already tried setup and failed
-    const storageSetupDone = sessionStorage.getItem('storage-setup-attempted');
-    if (storageSetupDone === 'true') {
-      return true;
-    }
-    
-    const result = await setupStorageBucket();
-    sessionStorage.setItem('storage-setup-attempted', 'true');
-    return result;
-  } catch (error) {
-    console.error('Error checking bucket:', error);
-    return false;
+  // Skip if already tried setup
+  const storageSetupDone = sessionStorage.getItem('storage-setup-attempted');
+  if (storageSetupDone === 'true') {
+    return true;
   }
+  
+  return await setupStorageBucket();
 };

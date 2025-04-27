@@ -13,12 +13,25 @@ import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
 import { setupStorageBucket } from "./lib/setupStorage";
 
-const queryClient = new QueryClient();
+// Create a client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => {
-  // Initialize storage on app start
+  // Initialize storage on app start - but don't block rendering
   useEffect(() => {
-    setupStorageBucket().catch(console.error);
+    // Use setTimeout to make sure this runs after initial render
+    setTimeout(() => {
+      setupStorageBucket().catch(err => {
+        console.log('Storage setup failed, continuing with fallback images');
+      });
+    }, 1000);
   }, []);
 
   return (

@@ -50,7 +50,7 @@ const Index = () => {
           <div className="container mx-auto px-6">
             <div className="max-w-3xl mx-auto">
               <img
-                src="https://via.placeholder.com/800x400?text=Label+Designer+Preview"
+                src="https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&w=800&h=400&q=80"
                 alt="Label Designer Preview"
                 className="w-full h-auto rounded-lg shadow-lg border"
               />
@@ -100,10 +100,10 @@ const Index = () => {
             <h2 className="text-3xl font-bold text-center mb-12">Ready-to-Use Templates</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                { name: 'Shipping Label', img: 'https://via.placeholder.com/200?text=Shipping' },
-                { name: 'Product Tag', img: 'https://via.placeholder.com/200?text=Product' },
-                { name: 'Return Label', img: 'https://via.placeholder.com/200?text=Return' },
-                { name: 'Address Label', img: 'https://via.placeholder.com/200?text=Address' }
+                { name: 'Shipping Label', img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=200&h=200&q=80' },
+                { name: 'Product Tag', img: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=200&h=200&q=80' },
+                { name: 'Return Label', img: 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?auto=format&fit=crop&w=200&h=200&q=80' },
+                { name: 'Address Label', img: 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&w=200&h=200&q=80' }
               ].map((template, index) => (
                 <div key={index} className="bg-white text-gray-800 rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow">
                   <img
