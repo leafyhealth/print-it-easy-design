@@ -99,6 +99,8 @@ const ElementProperties = () => {
         position: { x: number, y: number };
         size: { width: number, height: number };
         name: string;
+        rotation?: number;
+        layer?: number;
       }>;
     }) => {
       const { data, error } = await supabase
@@ -497,14 +499,14 @@ const ElementProperties = () => {
             <div className="space-y-2">
               <Label>Dynamic Data Field</Label>
               <Select
-                value={elementProperties.dataField || ''}
+                value={elementProperties.dataField || 'none'}
                 onValueChange={(value) => updateProperty('dataField', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="No data binding" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No data binding</SelectItem>
+                  <SelectItem value="none">No data binding</SelectItem>
                   <SelectItem value="firstName">First Name</SelectItem>
                   <SelectItem value="lastName">Last Name</SelectItem>
                   <SelectItem value="email">Email</SelectItem>
@@ -522,7 +524,7 @@ const ElementProperties = () => {
               </p>
             </div>
             
-            {elementProperties.dataField && (
+            {elementProperties.dataField && elementProperties.dataField !== 'none' && (
               <div className="space-y-2">
                 <Label>Preview Value</Label>
                 <Input

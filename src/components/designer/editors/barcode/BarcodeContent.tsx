@@ -15,7 +15,7 @@ interface BarcodeContentProps {
 const BarcodeContent: React.FC<BarcodeContentProps> = ({
   content,
   setContent,
-  barcodeType,
+  barcodeType = 'code128',
   setBarcodeType
 }) => {
   // Helper function to provide placeholder text based on barcode type

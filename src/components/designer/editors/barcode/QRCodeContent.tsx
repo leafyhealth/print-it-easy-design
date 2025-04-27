@@ -29,7 +29,7 @@ const QRCodeContent: React.FC<QRCodeContentProps> = ({
   setUrl,
   content,
   setContent,
-  qrStyle,
+  qrStyle = 'classic',
   setQrStyle
 }) => {
   return (
