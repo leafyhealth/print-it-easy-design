@@ -30,6 +30,32 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
 
+interface ElementPosition {
+  x: number;
+  y: number;
+}
+
+interface ElementSize {
+  width: number;
+  height: number;
+}
+
+interface ElementProperties {
+  [key: string]: any;
+}
+
+interface ElementData {
+  id: string;
+  name: string;
+  type: string;
+  position: ElementPosition;
+  size: ElementSize;
+  properties: ElementProperties;
+  rotation?: number;
+  layer?: number;
+  template_id?: string;
+}
+
 const ElementProperties = () => {
   const queryClient = useQueryClient();
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
@@ -78,7 +104,7 @@ const ElementProperties = () => {
           throw error;
         }
 
-        return data;
+        return data as ElementData;
       } catch (error: any) {
         console.error('Error fetching element:', error);
         return null;
@@ -95,9 +121,9 @@ const ElementProperties = () => {
     }: { 
       elementId: string; 
       updates: Partial<{
-        properties: any;
-        position: { x: number, y: number };
-        size: { width: number, height: number };
+        properties: ElementProperties;
+        position: ElementPosition;
+        size: ElementSize;
         name: string;
         rotation?: number;
         layer?: number;
@@ -119,7 +145,7 @@ const ElementProperties = () => {
         throw error;
       }
 
-      return data;
+      return data as ElementData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['element', selectedElementId] });
@@ -135,7 +161,7 @@ const ElementProperties = () => {
   const updateProperty = (propertyName: string, value: any) => {
     if (!selectedElementId || !elementData) return;
     
-    const properties = typeof elementData.properties === 'string' 
+    const properties: ElementProperties = typeof elementData.properties === 'string' 
       ? JSON.parse(elementData.properties) 
       : { ...elementData.properties };
     
@@ -150,7 +176,7 @@ const ElementProperties = () => {
   const updatePosition = (axis: 'x' | 'y', value: number) => {
     if (!selectedElementId || !elementData) return;
     
-    const position = typeof elementData.position === 'string' 
+    const position: ElementPosition = typeof elementData.position === 'string' 
       ? JSON.parse(elementData.position) 
       : { ...elementData.position };
     
@@ -165,7 +191,7 @@ const ElementProperties = () => {
   const updateSize = (dimension: 'width' | 'height', value: number) => {
     if (!selectedElementId || !elementData) return;
     
-    const size = typeof elementData.size === 'string' 
+    const size: ElementSize = typeof elementData.size === 'string' 
       ? JSON.parse(elementData.size) 
       : { ...elementData.size };
     
@@ -187,19 +213,19 @@ const ElementProperties = () => {
   };
 
   // Parse element properties
-  const elementProperties = elementData?.properties 
+  const elementProperties: ElementProperties = elementData?.properties 
     ? (typeof elementData.properties === 'string' 
         ? JSON.parse(elementData.properties) 
         : elementData.properties)
     : {};
   
-  const elementPosition = elementData?.position
+  const elementPosition: ElementPosition = elementData?.position
     ? (typeof elementData.position === 'string'
         ? JSON.parse(elementData.position)
         : elementData.position)
     : { x: 0, y: 0 };
     
-  const elementSize = elementData?.size
+  const elementSize: ElementSize = elementData?.size
     ? (typeof elementData.size === 'string'
         ? JSON.parse(elementData.size)
         : elementData.size)
