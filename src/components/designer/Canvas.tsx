@@ -1,8 +1,10 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 // Import our components
 import CanvasToolbar from './CanvasToolbar';
@@ -29,6 +31,8 @@ const Canvas: React.FC<CanvasProps> = ({
 }) => {
   const queryClient = useQueryClient();
   const canvasRef = useRef<HTMLDivElement>(null);
+  
+  // State management
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
@@ -53,6 +57,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [panStartPos, setPanStartPos] = useState({ x: 0, y: 0 });
 
+  // Query template data
   const { data: template, isLoading: isTemplateLoading, error: templateError } = useQuery({
     queryKey: ['template', templateId],
     queryFn: async () => {
@@ -84,12 +89,14 @@ const Canvas: React.FC<CanvasProps> = ({
     retry: 2
   });
 
+  // Get grid settings from template
   const gridSettings: GridSettings = template?.grid_settings ? 
     (typeof template.grid_settings === 'string' 
       ? JSON.parse(template.grid_settings) 
       : template.grid_settings as unknown as GridSettings) 
     : { showGrid: true, gridSize: 10 };
 
+  // Query template elements
   const { data: templateElements, isLoading: isElementsLoading, error: elementsError } = useQuery({
     queryKey: ['template-elements', templateId],
     queryFn: async () => {
@@ -123,74 +130,12 @@ const Canvas: React.FC<CanvasProps> = ({
   const isLoading = isTemplateLoading || isElementsLoading;
   const hasError = templateError || elementsError;
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col h-full">
-        <CanvasToolbar
-          onAddText={handleAddTextElement}
-          onAddImage={handleAddImageElement}
-          onAddBarcode={handleAddBarcodeElement}
-          onDeleteElement={handleDeleteElement}
-          hasSelectedElement={!!selectedElement}
-          showRulers={showRulers}
-          onToggleRulers={() => setShowRulers(!showRulers)}
-          showGrid={showGridState}
-          onToggleGrid={() => setShowGridState(!showGridState)}
-          zoomLevel={zoomLevel}
-          onZoomIn={() => setZoomLevel(Math.min(500, zoomLevel + 10))}
-          onZoomOut={() => setZoomLevel(Math.max(25, zoomLevel - 10))}
-          onZoomFit={handleZoomFit}
-          onZoomObjects={handleZoomObjects}
-        />
-        <div className="relative flex-1 overflow-auto bg-gray-300 flex items-center justify-center">
-          <div className="flex flex-col items-center justify-center bg-white p-8 rounded-lg shadow-lg">
-            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-            <p className="text-lg font-medium">Loading template...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (hasError) {
-    return (
-      <div className="flex flex-col h-full">
-        <CanvasToolbar
-          onAddText={handleAddTextElement}
-          onAddImage={handleAddImageElement}
-          onAddBarcode={handleAddBarcodeElement}
-          onDeleteElement={handleDeleteElement}
-          hasSelectedElement={!!selectedElement}
-          showRulers={showRulers}
-          onToggleRulers={() => setShowRulers(!showRulers)}
-          showGrid={showGridState}
-          onToggleGrid={() => setShowGridState(!showGridState)}
-          zoomLevel={zoomLevel}
-          onZoomIn={() => setZoomLevel(Math.min(500, zoomLevel + 10))}
-          onZoomOut={() => setZoomLevel(Math.max(25, zoomLevel - 10))}
-          onZoomFit={handleZoomFit}
-          onZoomObjects={handleZoomObjects}
-        />
-        <div className="relative flex-1 overflow-auto bg-gray-300 flex items-center justify-center">
-          <div className="bg-white p-8 rounded-lg shadow-lg max-w-md">
-            <h3 className="text-xl font-bold mb-2 text-red-600">Error Loading Template</h3>
-            <p className="mb-4">There was a problem loading the template or its elements.</p>
-            <Button onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ['template', templateId] });
-              queryClient.invalidateQueries({ queryKey: ['template-elements', templateId] });
-            }}>
-              Retry
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // Selected element data
   const selectedElementData = templateElements?.find(
     (element) => element.id === selectedElement
   );
 
+  // Mutations
   const addElementMutation = useMutation({
     mutationFn: async (newElement: {
       type: string;
@@ -307,6 +252,7 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   });
 
+  // Element handlers - defined before they're used in the useEffect or rendering
   const handleAddTextElement = () => {
     if (!templateId) {
       toast({
@@ -709,6 +655,7 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
+  // Effect for drag and resize events
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleDrag);
@@ -735,6 +682,7 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [isDragging, isResizing, isPanning, handleDrag, handleDragEnd, handleResize, handleResizeEnd, handlePan, handlePanEnd]);
 
+  // Effect for keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'z' && e.ctrlKey) {
@@ -778,6 +726,7 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [selectedElement, templateElements, updateElementMutation]);
 
+  // Effect for window resize
   useEffect(() => {
     const handleResize = () => {
       if (canvasRef.current && templateId) {
@@ -792,6 +741,7 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [templateId]);
 
+  // Effect for element event listeners
   useEffect(() => {
     const handleAddElement = (event: Event) => {
       const customEvent = event as CustomEvent;
@@ -799,16 +749,16 @@ const Canvas: React.FC<CanvasProps> = ({
       
       switch (elementType) {
         case 'text':
-          document.dispatchEvent(new CustomEvent('add-text-element'));
+          handleAddTextElement();
           break;
         case 'image':
-          document.dispatchEvent(new CustomEvent('add-image-element'));
+          handleAddImageElement();
           break;
         case 'barcode':
-          document.dispatchEvent(new CustomEvent('add-barcode-element'));
+          handleAddBarcodeElement();
           break;
         case 'shape':
-          document.dispatchEvent(new CustomEvent('add-shape-element'));
+          // handle shape element
           break;
       }
     };
@@ -824,8 +774,75 @@ const Canvas: React.FC<CanvasProps> = ({
       document.removeEventListener('add-image-element', handleAddImageElement);
       document.removeEventListener('add-barcode-element', handleAddBarcodeElement);
     };
-  }, []);
+  }, [templateId]); // Only depend on templateId since our handler functions are stable now
 
+  // Render loading state
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-full">
+        <CanvasToolbar
+          onAddText={handleAddTextElement}
+          onAddImage={handleAddImageElement}
+          onAddBarcode={handleAddBarcodeElement}
+          onDeleteElement={handleDeleteElement}
+          hasSelectedElement={!!selectedElement}
+          showRulers={showRulers}
+          onToggleRulers={() => setShowRulers(!showRulers)}
+          showGrid={showGridState}
+          onToggleGrid={() => setShowGridState(!showGridState)}
+          zoomLevel={zoomLevel}
+          onZoomIn={() => setZoomLevel(Math.min(500, zoomLevel + 10))}
+          onZoomOut={() => setZoomLevel(Math.max(25, zoomLevel - 10))}
+          onZoomFit={handleZoomFit}
+          onZoomObjects={handleZoomObjects}
+        />
+        <div className="relative flex-1 overflow-auto bg-gray-300 flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center bg-white p-8 rounded-lg shadow-lg">
+            <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+            <p className="text-lg font-medium">Loading template...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render error state
+  if (hasError) {
+    return (
+      <div className="flex flex-col h-full">
+        <CanvasToolbar
+          onAddText={handleAddTextElement}
+          onAddImage={handleAddImageElement}
+          onAddBarcode={handleAddBarcodeElement}
+          onDeleteElement={handleDeleteElement}
+          hasSelectedElement={!!selectedElement}
+          showRulers={showRulers}
+          onToggleRulers={() => setShowRulers(!showRulers)}
+          showGrid={showGridState}
+          onToggleGrid={() => setShowGridState(!showGridState)}
+          zoomLevel={zoomLevel}
+          onZoomIn={() => setZoomLevel(Math.min(500, zoomLevel + 10))}
+          onZoomOut={() => setZoomLevel(Math.max(25, zoomLevel - 10))}
+          onZoomFit={handleZoomFit}
+          onZoomObjects={handleZoomObjects}
+        />
+        <div className="relative flex-1 overflow-auto bg-gray-300 flex items-center justify-center">
+          <div className="bg-white p-8 rounded-lg shadow-lg max-w-md">
+            <h3 className="text-xl font-bold mb-2 text-red-600">Error Loading Template</h3>
+            <p className="mb-4">There was a problem loading the template or its elements.</p>
+            <Button onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['template', templateId] });
+              queryClient.invalidateQueries({ queryKey: ['template-elements', templateId] });
+            }}>
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main component render
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <CanvasToolbar
