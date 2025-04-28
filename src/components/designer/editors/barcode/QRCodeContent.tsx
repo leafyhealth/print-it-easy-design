@@ -23,15 +23,28 @@ interface QRCodeContentProps {
 }
 
 const QRCodeContent: React.FC<QRCodeContentProps> = ({
-  isUrl,
+  isUrl = false,
   setIsUrl,
-  url,
+  url = '',
   setUrl,
-  content,
+  content = '',
   setContent,
   qrStyle = 'classic',
   setQrStyle
 }) => {
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newUrl = e.target.value;
+    setUrl(newUrl);
+    
+    // Validate URL format
+    if (newUrl && !newUrl.match(/^(https?:\/\/)/i)) {
+      // Try to auto-correct common URL issues
+      if (newUrl.match(/^www\./i)) {
+        setUrl(`https://${newUrl}`);
+      }
+    }
+  };
+  
   return (
     <div className="space-y-4">
       <div className="flex items-center space-x-2">
@@ -49,7 +62,7 @@ const QRCodeContent: React.FC<QRCodeContentProps> = ({
           <Input 
             type="url"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={handleUrlChange}
             placeholder="https://example.com"
           />
           <p className="text-xs text-muted-foreground">
@@ -69,9 +82,9 @@ const QRCodeContent: React.FC<QRCodeContentProps> = ({
       
       <div className="space-y-2">
         <Label>QR Style</Label>
-        <Select value={qrStyle} onValueChange={setQrStyle}>
+        <Select value={qrStyle || 'classic'} onValueChange={setQrStyle}>
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue placeholder="Select style" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="classic">Classic</SelectItem>

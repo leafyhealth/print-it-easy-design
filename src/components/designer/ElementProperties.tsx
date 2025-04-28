@@ -37,6 +37,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Loader2 } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 
 // Define types for the element data
 interface ElementPosition {
@@ -65,6 +66,17 @@ interface ElementData {
   template_id?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+// Helper function to safely parse JSON or return default value
+const safeParseJSON = (jsonString: string | null | undefined, defaultValue: any): any => {
+  if (!jsonString) return defaultValue;
+  try {
+    return JSON.parse(jsonString);
+  } catch (e) {
+    console.error("Failed to parse JSON:", e);
+    return defaultValue;
+  }
 }
 
 const ElementProperties = () => {
@@ -111,20 +123,26 @@ const ElementProperties = () => {
           throw error;
         }
 
-        // Convert JSON strings to objects if needed
-        const processedData: ElementData = { ...data };
-        
-        if (typeof data.position === 'string') {
-          processedData.position = JSON.parse(data.position);
-        }
-        
-        if (typeof data.size === 'string') {
-          processedData.size = JSON.parse(data.size);
-        }
-        
-        if (typeof data.properties === 'string') {
-          processedData.properties = JSON.parse(data.properties);
-        }
+        // Properly convert data to ElementData type
+        const processedData: ElementData = {
+          id: data.id,
+          name: data.name,
+          type: data.type,
+          position: typeof data.position === 'string' 
+            ? safeParseJSON(data.position, { x: 0, y: 0 }) 
+            : data.position,
+          size: typeof data.size === 'string' 
+            ? safeParseJSON(data.size, { width: 100, height: 100 }) 
+            : data.size,
+          properties: typeof data.properties === 'string' 
+            ? safeParseJSON(data.properties, {}) 
+            : data.properties,
+          rotation: data.rotation,
+          layer: data.layer,
+          template_id: data.template_id,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+        };
         
         return processedData;
       } catch (error: any) {
@@ -142,7 +160,7 @@ const ElementProperties = () => {
       updates 
     }: { 
       elementId: string; 
-      updates: ElementData;
+      updates: Record<string, any>;
     }) => {
       const { data, error } = await supabase
         .from('template_elements')
@@ -157,19 +175,25 @@ const ElementProperties = () => {
       }
 
       // Convert JSON strings to objects for the returned data
-      const processedData: ElementData = { ...data };
-        
-      if (typeof data.position === 'string') {
-        processedData.position = JSON.parse(data.position);
-      }
-      
-      if (typeof data.size === 'string') {
-        processedData.size = JSON.parse(data.size);
-      }
-      
-      if (typeof data.properties === 'string') {
-        processedData.properties = JSON.parse(data.properties);
-      }
+      const processedData: ElementData = {
+        id: data.id,
+        name: data.name,
+        type: data.type,
+        position: typeof data.position === 'string' 
+          ? safeParseJSON(data.position, { x: 0, y: 0 }) 
+          : data.position,
+        size: typeof data.size === 'string' 
+          ? safeParseJSON(data.size, { width: 100, height: 100 }) 
+          : data.size,
+        properties: typeof data.properties === 'string' 
+          ? safeParseJSON(data.properties, {}) 
+          : data.properties,
+        rotation: data.rotation,
+        layer: data.layer,
+        template_id: data.template_id,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
       
       return processedData;
     },
@@ -181,6 +205,11 @@ const ElementProperties = () => {
     },
     onError: (error) => {
       console.error('Error updating element:', error);
+      toast({
+        title: "Failed to update element",
+        description: "There was an error updating the element properties.",
+        variant: "destructive"
+      });
     }
   });
 
@@ -189,9 +218,7 @@ const ElementProperties = () => {
     if (!selectedElementId || !elementData) return;
     
     const properties: ElementProperties = { 
-      ...((typeof elementData.properties === 'string') 
-        ? JSON.parse(elementData.properties) 
-        : (elementData.properties || {}))
+      ...getElementProperties()
     };
     
     properties[propertyName] = value;
@@ -207,9 +234,7 @@ const ElementProperties = () => {
     if (!selectedElementId || !elementData) return;
     
     const position: ElementPosition = { 
-      ...((typeof elementData.position === 'string') 
-        ? JSON.parse(elementData.position) 
-        : (elementData.position || { x: 0, y: 0 }))
+      ...getElementPosition()
     };
     
     position[axis] = value;
@@ -225,9 +250,7 @@ const ElementProperties = () => {
     if (!selectedElementId || !elementData) return;
     
     const size: ElementSize = { 
-      ...((typeof elementData.size === 'string') 
-        ? JSON.parse(elementData.size) 
-        : (elementData.size || { width: 100, height: 100 }))
+      ...getElementSize()
     };
     
     size[dimension] = value;
@@ -252,27 +275,21 @@ const ElementProperties = () => {
   const getElementProperties = (): ElementProperties => {
     if (!elementData) return {};
     
-    return (typeof elementData.properties === 'string') 
-      ? JSON.parse(elementData.properties) 
-      : (elementData.properties || {});
+    return (elementData.properties || {}) as ElementProperties;
   };
   
   // Get parsed position
   const getElementPosition = (): ElementPosition => {
     if (!elementData) return { x: 0, y: 0 };
     
-    return (typeof elementData.position === 'string')
-      ? JSON.parse(elementData.position)
-      : (elementData.position || { x: 0, y: 0 });
+    return (elementData.position || { x: 0, y: 0 }) as ElementPosition;
   };
   
   // Get parsed size
   const getElementSize = (): ElementSize => {
     if (!elementData) return { width: 100, height: 100 };
     
-    return (typeof elementData.size === 'string')
-      ? JSON.parse(elementData.size)
-      : (elementData.size || { width: 100, height: 100 });
+    return (elementData.size || { width: 100, height: 100 }) as ElementSize;
   };
 
   if (!selectedElementId) {

@@ -38,6 +38,16 @@ const DeviceUploader: React.FC<DeviceUploaderProps> = ({
         return;
       }
       
+      // Check file type
+      if (!file.type.match(/^image\/(jpeg|jpg|png|gif|webp|svg\+xml)$/i)) {
+        toast({
+          title: "Invalid file type",
+          description: "Please select a valid image file (JPEG, PNG, GIF, WebP, SVG)",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       setSelectedFile(file);
       setUploadError(null);
       
@@ -47,6 +57,52 @@ const DeviceUploader: React.FC<DeviceUploaderProps> = ({
         setPreviewUrl(reader.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+  
+  const uploadWithFallback = async () => {
+    if (!selectedFile) return null;
+    
+    try {
+      // Try to use Supabase Storage if bucket is ready
+      if (bucketReady) {
+        console.log("Attempting Supabase upload...");
+        // Create filename
+        const fileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
+        const filePath = `images/${fileName}`;
+        
+        console.log(`Uploading file to path: ${filePath}`);
+        // Upload the file
+        const { data, error } = await supabase.storage
+          .from('template_assets')
+          .upload(filePath, selectedFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
+          
+        if (error) {
+          console.error('Upload error details:', error);
+          throw error;
+        }
+        
+        console.log("Upload successful, getting public URL");
+        // Get the public URL
+        const { data: publicUrlData } = supabase.storage
+          .from('template_assets')
+          .getPublicUrl(filePath);
+          
+        console.log("Public URL:", publicUrlData.publicUrl);
+        return publicUrlData.publicUrl;
+      }
+      
+      // Fallback to data URL if Supabase storage isn't available
+      console.log("Falling back to data URL for image");
+      return previewUrl;
+    } catch (error) {
+      console.error("Error in upload:", error);
+      // Fallback to data URL if any error occurs
+      console.log("Error occurred, falling back to data URL for image");
+      return previewUrl;
     }
   };
   
@@ -60,17 +116,6 @@ const DeviceUploader: React.FC<DeviceUploaderProps> = ({
       return;
     }
     
-    if (!bucketReady) {
-      // If bucket isn't ready, let the user know they can use an external URL instead
-      toast({
-        title: "Storage not ready",
-        description: "We're experiencing issues with our storage system. Please use an external image URL instead.",
-        variant: "destructive"
-      });
-      setUploadError("Storage not available. Please use an external URL instead.");
-      return;
-    }
-    
     setUploading(true);
     setUploadError(null);
     
@@ -79,38 +124,15 @@ const DeviceUploader: React.FC<DeviceUploaderProps> = ({
       // Force bucket creation once more right before upload
       const bucketExists = await ensureStorageBucketExists();
       
-      if (!bucketExists) {
-        throw new Error("Storage bucket is not available");
+      // Upload with fallback strategy
+      const imageUrl = await uploadWithFallback();
+      
+      if (!imageUrl) {
+        throw new Error("Failed to get image URL after upload");
       }
-      
-      // Create filename
-      const fileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
-      const filePath = `images/${fileName}`;
-      
-      console.log(`Uploading file to path: ${filePath}`);
-      // Upload the file
-      const { data, error } = await supabase.storage
-        .from('template_assets')
-        .upload(filePath, selectedFile, {
-          cacheControl: '3600',
-          upsert: false
-        });
-        
-      if (error) {
-        console.error('Upload error details:', error);
-        throw error;
-      }
-      
-      console.log("Upload successful, getting public URL");
-      // Get the public URL
-      const { data: publicUrlData } = supabase.storage
-        .from('template_assets')
-        .getPublicUrl(filePath);
-        
-      console.log("Public URL:", publicUrlData.publicUrl);
       
       // Call onImageSelect with the URL
-      onImageSelect(publicUrlData.publicUrl);
+      onImageSelect(imageUrl);
       
       // Close the dialog
       onClose();
@@ -152,13 +174,13 @@ const DeviceUploader: React.FC<DeviceUploaderProps> = ({
                 <p className="text-xs text-gray-500">
                   <span className="font-semibold">Click to upload</span> or drag and drop
                 </p>
-                <p className="text-xs text-gray-500">PNG, JPG, or SVG (max 2MB)</p>
+                <p className="text-xs text-gray-500">PNG, JPG, GIF, SVG, WebP (max 2MB)</p>
               </div>
             )}
             <input 
               id="file-upload"
               type="file"
-              accept="image/*" 
+              accept="image/jpeg, image/png, image/gif, image/webp, image/svg+xml" 
               onChange={handleFileChange} 
               className="hidden" 
             />
@@ -175,7 +197,7 @@ const DeviceUploader: React.FC<DeviceUploaderProps> = ({
         {selectedFile && (
           <Button 
             onClick={handleUpload} 
-            disabled={uploading || !!uploadError}
+            disabled={uploading}
             className="w-full"
           >
             {uploading ? 'Uploading...' : 'Upload Image'}

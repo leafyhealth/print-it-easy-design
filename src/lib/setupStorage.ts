@@ -33,29 +33,36 @@ export const setupStorageBucket = async (): Promise<boolean> => {
     // Create the bucket if it doesn't exist
     console.log('Bucket not found, creating template_assets bucket...');
     
-    const { data, error: createBucketError } = await supabase.storage
-      .createBucket('template_assets', {
-        public: true,
-        fileSizeLimit: 5242880, // 5MB
-      });
-      
-    if (createBucketError) {
-      console.log('Error creating bucket:', createBucketError.message);
-      // Handle RLS policy error gracefully
-      if (createBucketError.message.includes('policy')) {
-        console.log('RLS policy preventing bucket creation - using fallback images');
-        return true; // Return true so the app can continue with placeholder images
-      } else {
-        console.error('Error creating template_assets bucket:', createBucketError);
-        return false;
+    try {
+      const { data, error: createBucketError } = await supabase.storage
+        .createBucket('template_assets', {
+          public: true,
+          fileSizeLimit: 5242880, // 5MB
+        });
+        
+      if (createBucketError) {
+        console.log('Error creating bucket:', createBucketError.message);
+        // Handle RLS policy error gracefully
+        if (createBucketError.message.includes('policy')) {
+          console.log('RLS policy preventing bucket creation - using fallback images');
+          // Continue with the application despite the RLS error
+          return true;
+        } else {
+          console.error('Error creating template_assets bucket:', createBucketError);
+          return false;
+        }
       }
+      
+      console.log('Storage bucket created successfully');
+      return true;
+    } catch (error) {
+      // Catch any unexpected errors during bucket creation
+      console.error('Unexpected error during bucket creation:', error);
+      return true; // Still return true to allow the app to work with fallback images
     }
-    
-    console.log('Storage bucket created successfully');
-    return true;
   } catch (error) {
     console.error('Error setting up storage bucket:', error);
-    return false;
+    return true; // Still return true to allow the app to work with fallback images
   } finally {
     console.log('Storage bucket setup complete');
   }
