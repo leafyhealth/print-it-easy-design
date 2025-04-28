@@ -1,7 +1,7 @@
-
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { DesignElement } from '@/types/designer';
+import QRCode from 'qrcode';
 
 interface CanvasElementProps {
   element: any; // Using any temporarily for compatibility
@@ -22,6 +22,8 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
   onDragStart,
   onResizeStart
 }) => {
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
+  
   const elementPosition = element.position;
   const elementSize = element.size;
   const elementProperties = element.properties;
@@ -38,6 +40,33 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
     border: isSelected ? '1px solid #0284c7' : 'none'
   };
   
+  useEffect(() => {
+    if (element.type === 'barcode' && 
+        element.properties.barcodeType === 'qrcode' && 
+        element.properties.content && 
+        qrCanvasRef.current) {
+      
+      const options = {
+        errorCorrectionLevel: 'H',
+        margin: 1,
+        width: element.size.width * (zoomLevel / 100),
+        color: {
+          dark: element.properties.foregroundColor || '#000000',
+          light: element.properties.backgroundColor || '#FFFFFF'
+        }
+      };
+
+      QRCode.toCanvas(
+        qrCanvasRef.current,
+        element.properties.content,
+        options,
+        (error) => {
+          if (error) console.error('Error generating QR code:', error);
+        }
+      );
+    }
+  }, [element, zoomLevel]);
+
   return (
     <div
       key={element.id}
@@ -84,30 +113,23 @@ const CanvasElement: React.FC<CanvasElementProps> = ({
       
       {element.type === 'barcode' && (
         <div className="w-full h-full flex items-center justify-center">
-          {elementProperties.barcodeType === 'qrcode' ? (
-            <div 
-              className="qrcode-placeholder bg-black/90"
-              style={{width: '90%', height: '90%'}}
-              title={elementProperties.content}
-            >
-              <div className="w-full h-full relative">
-                <div className="absolute inset-3 border-4 border-white flex items-center justify-center">
-                  <div className="bg-white w-1/3 h-1/3 flex items-center justify-center text-[6px] text-black">
-                    QR
-                  </div>
-                </div>
-              </div>
+          {element.properties.barcodeType === 'qrcode' ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <canvas
+                ref={qrCanvasRef}
+                className="max-w-full max-h-full"
+              />
             </div>
           ) : (
             <div 
               className="barcode-placeholder bg-gradient-to-r from-black via-white to-black"
               style={{width: '100%', height: '50%'}}
-              title={elementProperties.content}
+              title={element.properties.content}
             />
           )}
-          {elementProperties.showText && (
+          {element.properties.showText && element.properties.barcodeType !== 'qrcode' && (
             <div className="absolute bottom-0 text-center w-full text-xs">
-              {elementProperties.content}
+              {element.properties.content}
             </div>
           )}
         </div>

@@ -1,8 +1,9 @@
-
 import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Link } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 import { 
   Select,
   SelectContent,
@@ -36,12 +37,21 @@ const QRCodeContent: React.FC<QRCodeContentProps> = ({
     const newUrl = e.target.value;
     setUrl(newUrl);
     
-    // Validate URL format
-    if (newUrl && !newUrl.match(/^(https?:\/\/)/i)) {
-      // Try to auto-correct common URL issues
-      if (newUrl.match(/^www\./i)) {
-        setUrl(`https://${newUrl}`);
+    try {
+      if (newUrl) {
+        let urlToTest = newUrl;
+        if (!newUrl.match(/^https?:\/\//i)) {
+          urlToTest = `https://${newUrl}`;
+        }
+        new URL(urlToTest);
+        setUrl(urlToTest);
       }
+    } catch (error) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid URL",
+        variant: "destructive"
+      });
     }
   };
   
@@ -53,7 +63,9 @@ const QRCodeContent: React.FC<QRCodeContentProps> = ({
           checked={isUrl} 
           onCheckedChange={setIsUrl}
         />
-        <Label htmlFor="url-mode">URL Mode</Label>
+        <Label htmlFor="url-mode" className="flex items-center gap-2">
+          URL Mode <Link className="h-4 w-4" />
+        </Label>
       </div>
       
       {isUrl ? (
@@ -64,9 +76,10 @@ const QRCodeContent: React.FC<QRCodeContentProps> = ({
             value={url}
             onChange={handleUrlChange}
             placeholder="https://example.com"
+            className="font-mono text-sm"
           />
           <p className="text-xs text-muted-foreground">
-            Enter a URL starting with http:// or https://
+            Enter a URL starting with http:// or https:// (will be auto-corrected if needed)
           </p>
         </div>
       ) : (
@@ -82,7 +95,7 @@ const QRCodeContent: React.FC<QRCodeContentProps> = ({
       
       <div className="space-y-2">
         <Label>QR Style</Label>
-        <Select value={qrStyle || 'classic'} onValueChange={setQrStyle}>
+        <Select value={qrStyle} onValueChange={setQrStyle}>
           <SelectTrigger>
             <SelectValue placeholder="Select style" />
           </SelectTrigger>
@@ -90,7 +103,6 @@ const QRCodeContent: React.FC<QRCodeContentProps> = ({
             <SelectItem value="classic">Classic</SelectItem>
             <SelectItem value="rounded">Rounded Corners</SelectItem>
             <SelectItem value="colored">Custom Color</SelectItem>
-            <SelectItem value="logo">With Logo</SelectItem>
           </SelectContent>
         </Select>
       </div>
