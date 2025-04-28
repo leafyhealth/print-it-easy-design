@@ -11,6 +11,8 @@ import TemplatesPage from "./pages/TemplatesPage";
 import DataPage from "./pages/DataPage";
 import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
+import LabelsPage from "./pages/labels/LabelsPage";
+import LabelHistoryPage from "./pages/labels/LabelHistoryPage";
 import { setupStorageBucket } from "./lib/setupStorage";
 
 // Create a client
@@ -46,6 +48,8 @@ const App = () => {
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/data" element={<DataPage />} />
             <Route path="/auth" element={<AuthPage />} />
+            <Route path="/labels" element={<LabelsPage />} />
+            <Route path="/labels/history" element={<LabelHistoryPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

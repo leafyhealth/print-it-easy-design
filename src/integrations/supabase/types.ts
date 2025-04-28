@@ -9,6 +9,86 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      label_tracking: {
+        Row: {
+          id: string
+          label_id: string | null
+          order_id: string | null
+          serial_no: number
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          label_id?: string | null
+          order_id?: string | null
+          serial_no: number
+          status: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          label_id?: string | null
+          order_id?: string | null
+          serial_no?: number
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "label_tracking_label_id_fkey"
+            columns: ["label_id"]
+            isOneToOne: false
+            referencedRelation: "labels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      labels: {
+        Row: {
+          batch_no: string
+          branch_id: string | null
+          expiry_date: string
+          food_license: string | null
+          id: string
+          mrp: number
+          printed_at: string | null
+          printed_by: string | null
+          product_id: string | null
+          serial_end: number
+          serial_start: number
+          weight: string
+        }
+        Insert: {
+          batch_no: string
+          branch_id?: string | null
+          expiry_date: string
+          food_license?: string | null
+          id?: string
+          mrp: number
+          printed_at?: string | null
+          printed_by?: string | null
+          product_id?: string | null
+          serial_end: number
+          serial_start: number
+          weight: string
+        }
+        Update: {
+          batch_no?: string
+          branch_id?: string | null
+          expiry_date?: string
+          food_license?: string | null
+          id?: string
+          mrp?: number
+          printed_at?: string | null
+          printed_by?: string | null
+          product_id?: string | null
+          serial_end?: number
+          serial_start?: number
+          weight?: string
+        }
+        Relationships: []
+      }
       template_elements: {
         Row: {
           created_at: string | null
