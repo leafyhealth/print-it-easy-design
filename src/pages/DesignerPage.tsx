@@ -11,6 +11,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Loader2 } from 'lucide-react';
+import VisualAidTools from '../components/designer/VisualAidTools';
 
 // Skip storage bucket creation attempt since it's causing issues
 const skipStorageCreation = true;
@@ -21,6 +22,12 @@ const DesignerPage = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | undefined>(undefined);
   const [user, setUser] = useState<any>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  
+  // Visual aid states
+  const [showGrid, setShowGrid] = useState(true);
+  const [showRulers, setShowRulers] = useState(true);
+  const [showSnaplines, setShowSnaplines] = useState(true);
+  const [showMargins, setShowMargins] = useState(true);
 
   // Check URL for template parameter
   useEffect(() => {
@@ -223,6 +230,15 @@ const DesignerPage = () => {
     };
   }, []);
 
+  // Alignment handlers for the VisualAidTools component
+  const handleAlignHorizontal = (position: 'start' | 'center' | 'end') => {
+    document.dispatchEvent(new CustomEvent('align-horizontal', { detail: { position } }));
+  };
+
+  const handleAlignVertical = (position: 'start' | 'center' | 'end') => {
+    document.dispatchEvent(new CustomEvent('align-vertical', { detail: { position } }));
+  };
+
   // Show error state if templates failed to load
   if (templatesError) {
     return (
@@ -270,23 +286,42 @@ const DesignerPage = () => {
             selectedTemplateId={selectedTemplateId}
           />
         </div>
-        <div className="flex-1 overflow-hidden">
-          {selectedTemplateId ? (
-            <Canvas 
-              width={templates?.find(t => t.id === selectedTemplateId)?.width || 600}
-              height={templates?.find(t => t.id === selectedTemplateId)?.height || 400}
-              showGrid={true} 
-              templateId={selectedTemplateId}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="p-2 border-b bg-gray-50">
+            <VisualAidTools 
+              showGrid={showGrid}
+              showRulers={showRulers}
+              showSnaplines={showSnaplines}
+              showMargins={showMargins}
+              onToggleGrid={() => setShowGrid(!showGrid)}
+              onToggleRulers={() => setShowRulers(!showRulers)}
+              onToggleSnaplines={() => setShowSnaplines(!showSnaplines)}
+              onToggleMargins={() => setShowMargins(!showMargins)}
+              onAlignHorizontal={handleAlignHorizontal}
+              onAlignVertical={handleAlignVertical}
             />
-          ) : (
-            <div className="h-full flex items-center justify-center bg-gray-100">
-              <div className="text-center p-6">
-                <h2 className="text-2xl font-bold mb-2">Welcome to PrintEasy</h2>
-                <p className="text-gray-600 mb-4">Select a template or create a new one to get started.</p>
-                <Button onClick={() => setShowPaperTemplateSelector(true)}>Create New Template</Button>
+          </div>
+          <div className="flex-1">
+            {selectedTemplateId ? (
+              <Canvas 
+                width={templates?.find(t => t.id === selectedTemplateId)?.width || 600}
+                height={templates?.find(t => t.id === selectedTemplateId)?.height || 400}
+                showGrid={showGrid} 
+                templateId={selectedTemplateId}
+                showMargins={showMargins}
+                showRulers={showRulers}
+                showSnaplines={showSnaplines}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center bg-gray-100">
+                <div className="text-center p-6">
+                  <h2 className="text-2xl font-bold mb-2">Welcome to PrintEasy</h2>
+                  <p className="text-gray-600 mb-4">Select a template or create a new one to get started.</p>
+                  <Button onClick={() => setShowPaperTemplateSelector(true)}>Create New Template</Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
       <Footer />

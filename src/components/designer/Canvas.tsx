@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +20,9 @@ interface CanvasProps {
   height?: number;
   showGrid?: boolean;
   templateId?: string;
+  showMargins?: boolean;
+  showRulers?: boolean;
+  showSnaplines?: boolean;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -28,6 +30,9 @@ const Canvas: React.FC<CanvasProps> = ({
   height = 400,
   showGrid: initialShowGrid = true,
   templateId,
+  showMargins: initialShowMargins = false,
+  showRulers: initialShowRulers = true,
+  showSnaplines: initialShowSnaplines = false,
 }) => {
   const queryClient = useQueryClient();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -49,9 +54,9 @@ const Canvas: React.FC<CanvasProps> = ({
   } | null>(null);
   
   const [zoomLevel, setZoomLevel] = useState(100);
-  const [showRulers, setShowRulers] = useState(true);
-  const [showSnaplines, setShowSnaplines] = useState(true);
-  const [showMargins, setShowMargins] = useState(true);
+  const [showRulers, setShowRulers] = useState(initialShowRulers);
+  const [showSnaplines, setShowSnaplines] = useState(initialShowSnaplines);
+  const [showMargins, setShowMargins] = useState(initialShowMargins);
   const [showGridState, setShowGridState] = useState(initialShowGrid);
   const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -884,6 +889,8 @@ const Canvas: React.FC<CanvasProps> = ({
             height={height}
             zoomLevel={zoomLevel}
             gridSize={gridSettings?.gridSize || 10}
+            showMargins={showMargins}
+            marginSize={15}
           />
           
           <CanvasRulers
