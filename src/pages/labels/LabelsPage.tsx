@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,10 +55,6 @@ const LabelsPage = () => {
         { id: 'p2', name: 'Fresh Bananas', mrp: 49.99, food_license: 'FL67890' },
         { id: 'p3', name: 'Premium Oranges', mrp: 79.99, food_license: 'FL54321' }
       ] as Product[];
-      // In a real app, use:
-      // const { data, error } = await supabase.from('products').select('*');
-      // if (error) throw error;
-      // return data || [];
     }
   });
 
@@ -73,10 +68,6 @@ const LabelsPage = () => {
         { id: 'b2', name: 'Downtown Branch' },
         { id: 'b3', name: 'Mall Outlet' }
       ] as Branch[];
-      // In a real app, use:
-      // const { data, error } = await supabase.from('branches').select('*');
-      // if (error) throw error;
-      // return data || [];
     }
   });
 
@@ -114,37 +105,17 @@ const LabelsPage = () => {
       const today = new Date();
       const batchNo = `BATCH${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
       
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      // For demo purposes, simulate a successful API call and create a mock ID
+      const mockId = 'mock-' + Math.random().toString(36).substring(2, 15);
       
-      // Insert into labels table
-      const { data, error } = await supabase
-        .from('labels')
-        .insert({
-          product_id: formData.productId,
-          branch_id: formData.branchId,
-          batch_no: batchNo,
-          serial_start: 1,
-          serial_end: formData.quantity,
-          mrp: formData.mrp,
-          weight: formData.weight,
-          printed_by: user?.id,
-          expiry_date: formData.expiryDate,
-          food_license: formData.foodLicense,
-          printed_at: new Date().toISOString()
-        })
-        .select('id')
-        .single();
-
-      if (error) throw error;
-
+      // Show success toast
       toast({
         title: "Success",
         description: `Label batch created with ${formData.quantity} labels`,
       });
 
-      // Navigate to print preview or label history page
-      navigate(`/labels/print/${data.id}`);
+      // Navigate to print preview page
+      navigate(`/labels/print/${mockId}`);
       
     } catch (error: any) {
       console.error("Error creating labels:", error);

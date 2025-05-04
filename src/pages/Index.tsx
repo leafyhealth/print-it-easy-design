@@ -19,8 +19,12 @@ const Index = () => {
           </div>
           
           <div className="space-x-2">
-            <Button variant="ghost">Login</Button>
-            <Button>Get Started</Button>
+            <Button variant="ghost" asChild>
+              <Link to="/auth">Login</Link>
+            </Button>
+            <Button asChild>
+              <Link to="/designer">Get Started</Link>
+            </Button>
           </div>
         </div>
       </header>
@@ -130,7 +134,7 @@ const Index = () => {
               Join businesses that use PrintEasy to create professional, customized labels for all their needs.
             </p>
             <Button size="lg" asChild className="px-8">
-              <Link to="/designer">Start Designing Now</Link>
+              <Link to="/labels">Start Creating Labels Now</Link>
             </Button>
           </div>
         </section>
@@ -153,10 +157,10 @@ const Index = () => {
             
             <div>
               <ul className="flex space-x-4">
-                <li><a href="#" className="text-gray-600 hover:text-designer-primary">About</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-designer-primary">Features</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-designer-primary">Templates</a></li>
-                <li><a href="#" className="text-gray-600 hover:text-designer-primary">Contact</a></li>
+                <li><Link to="/designer" className="text-gray-600 hover:text-designer-primary">Designer</Link></li>
+                <li><Link to="/templates" className="text-gray-600 hover:text-designer-primary">Templates</Link></li>
+                <li><Link to="/labels" className="text-gray-600 hover:text-designer-primary">Labels</Link></li>
+                <li><Link to="/labels/history" className="text-gray-600 hover:text-designer-primary">History</Link></li>
               </ul>
             </div>
           </div>
