@@ -13,6 +13,8 @@ import AuthPage from "./pages/AuthPage";
 import NotFound from "./pages/NotFound";
 import LabelsPage from "./pages/labels/LabelsPage";
 import LabelHistoryPage from "./pages/labels/LabelHistoryPage";
+import PrintLabelPage from "./pages/labels/PrintLabelPage";
+import LabelReportsPage from "./pages/labels/LabelReportsPage";
 import { setupStorageBucket } from "./lib/setupStorage";
 
 // Create a client
@@ -50,6 +52,8 @@ const App = () => {
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/labels" element={<LabelsPage />} />
             <Route path="/labels/history" element={<LabelHistoryPage />} />
+            <Route path="/labels/print/:id" element={<PrintLabelPage />} />
+            <Route path="/labels/reports" element={<LabelReportsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
