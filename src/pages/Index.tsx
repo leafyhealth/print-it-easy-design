@@ -161,6 +161,7 @@ const Index = () => {
                 <li><Link to="/templates" className="text-gray-600 hover:text-designer-primary">Templates</Link></li>
                 <li><Link to="/labels" className="text-gray-600 hover:text-designer-primary">Labels</Link></li>
                 <li><Link to="/labels/history" className="text-gray-600 hover:text-designer-primary">History</Link></li>
+                <li><Link to="/labels/reports" className="text-gray-600 hover:text-designer-primary">Reports</Link></li>
               </ul>
             </div>
           </div>

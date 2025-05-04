@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,7 +50,12 @@ const LabelsPage = () => {
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ['products'],
     queryFn: async () => {
-      // Dummy products for demo, replace with actual API call
+      // In a real implementation, we would fetch from Supabase
+      // const { data, error } = await supabase.from('products').select('*');
+      // if (error) throw error;
+      // return data;
+      
+      // Mock data for demonstration
       return [
         { id: 'p1', name: 'Organic Apples', mrp: 99.99, food_license: 'FL12345' },
         { id: 'p2', name: 'Fresh Bananas', mrp: 49.99, food_license: 'FL67890' },
@@ -62,7 +68,12 @@ const LabelsPage = () => {
   const { data: branches, isLoading: branchesLoading } = useQuery({
     queryKey: ['branches'],
     queryFn: async () => {
-      // Dummy branches for demo, replace with actual API call
+      // In a real implementation, we would fetch from Supabase
+      // const { data, error } = await supabase.from('branches').select('*');
+      // if (error) throw error;
+      // return data;
+      
+      // Mock data for demonstration
       return [
         { id: 'b1', name: 'Main Store' },
         { id: 'b2', name: 'Downtown Branch' },
@@ -105,7 +116,24 @@ const LabelsPage = () => {
       const today = new Date();
       const batchNo = `BATCH${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
       
-      // For demo purposes, simulate a successful API call and create a mock ID
+      // Create a new label batch record
+      // In a real implementation, we would insert to Supabase
+      // const { data, error } = await supabase.from('labels').insert({
+      //   product_id: formData.productId,
+      //   branch_id: formData.branchId,
+      //   batch_no: batchNo,
+      //   serial_start: 1,
+      //   serial_end: formData.quantity,
+      //   mrp: formData.mrp,
+      //   weight: formData.weight,
+      //   expiry_date: formData.expiryDate,
+      //   food_license: formData.foodLicense,
+      //   printed_at: new Date().toISOString()
+      // }).select().single();
+      
+      // if (error) throw error;
+      
+      // For demo purposes, create a mock ID
       const mockId = 'mock-' + Math.random().toString(36).substring(2, 15);
       
       // Show success toast
@@ -113,6 +141,29 @@ const LabelsPage = () => {
         title: "Success",
         description: `Label batch created with ${formData.quantity} labels`,
       });
+
+      // Store label data in session storage so it can be accessed by print page
+      // This is a workaround for demo purposes - in a real app we would fetch from the database
+      const selectedProduct = products?.find(p => p.id === formData.productId);
+      const selectedBranch = branches?.find(b => b.id === formData.branchId);
+      
+      const labelData = {
+        id: mockId,
+        batch_no: batchNo,
+        product_id: formData.productId,
+        product_name: selectedProduct?.name || 'Unknown Product',
+        branch_id: formData.branchId,
+        branch_name: selectedBranch?.name || 'Unknown Branch',
+        serial_start: 1,
+        serial_end: formData.quantity,
+        mrp: formData.mrp,
+        weight: formData.weight,
+        expiry_date: formData.expiryDate,
+        food_license: formData.foodLicense,
+        printed_at: new Date().toISOString()
+      };
+      
+      sessionStorage.setItem(`label_${mockId}`, JSON.stringify(labelData));
 
       // Navigate to print preview page
       navigate(`/labels/print/${mockId}`);

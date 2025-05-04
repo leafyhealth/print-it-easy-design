@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,24 +33,63 @@ const LabelHistoryPage = () => {
     date: '',
   });
 
+  useEffect(() => {
+    // Check if there are any stored labels in session storage and add them to history
+    const keys = Object.keys(sessionStorage);
+    const labelKeys = keys.filter(key => key.startsWith('label_'));
+    
+    if (labelKeys.length > 0) {
+      console.log(`Found ${labelKeys.length} stored labels in session storage`);
+    }
+  }, []);
+
   // Fetch label history
   const { data: labels, isLoading } = useQuery({
     queryKey: ['labels', 'history', filters],
     queryFn: async () => {
-      // In a real app, use Supabase
+      // First check session storage for any labels created in current session
+      const keys = Object.keys(sessionStorage);
+      const labelKeys = keys.filter(key => key.startsWith('label_'));
+      const sessionLabels: Label[] = labelKeys
+        .map(key => {
+          try {
+            const data = JSON.parse(sessionStorage.getItem(key) || '');
+            return {
+              id: data.id,
+              batch_no: data.batch_no,
+              product_id: data.product_id,
+              branch_id: data.branch_id,
+              serial_start: data.serial_start,
+              serial_end: data.serial_end,
+              mrp: data.mrp,
+              weight: data.weight,
+              printed_at: data.printed_at,
+              expiry_date: data.expiry_date,
+              product_name: data.product_name
+            } as Label;
+          } catch (e) {
+            console.error("Error parsing session storage label:", e);
+            return null;
+          }
+        })
+        .filter(Boolean) as Label[];
+      
+      // In a real implementation, we would fetch from Supabase and combine with session data
       // const { data, error } = await supabase
       //   .from('labels')
       //   .select('*, products(name)')
       //   .order('printed_at', { ascending: false });
-      
       // if (error) throw error;
-      // return data.map(item => ({
+      
+      // const dbLabels = data.map(item => ({
       //   ...item,
       //   product_name: item.products?.name
       // }));
-
-      // Demo data for now
-      return [
+      
+      // return [...sessionLabels, ...dbLabels];
+      
+      // For demo, use static data plus session data
+      const demoLabels = [
         {
           id: '1',
           batch_no: 'BATCH20250501',
@@ -91,6 +130,27 @@ const LabelHistoryPage = () => {
           product_name: 'Premium Oranges'
         }
       ];
+      
+      // Apply filters
+      let filteredLabels = [...sessionLabels, ...demoLabels];
+      
+      if (filters.branch) {
+        filteredLabels = filteredLabels.filter(label => label.branch_id === filters.branch);
+      }
+      
+      if (filters.product) {
+        filteredLabels = filteredLabels.filter(label => label.product_id === filters.product);
+      }
+      
+      if (filters.date) {
+        const filterDate = new Date(filters.date);
+        filteredLabels = filteredLabels.filter(label => {
+          const labelDate = new Date(label.printed_at);
+          return labelDate.toDateString() === filterDate.toDateString();
+        });
+      }
+      
+      return filteredLabels;
     }
   });
 

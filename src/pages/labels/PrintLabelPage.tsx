@@ -1,9 +1,9 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import { Printer, Save, RefreshCw, List, Download } from "lucide-react";
+import { Printer, Save, RefreshCw, List } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { toast } from "@/components/ui/use-toast";
@@ -12,19 +12,16 @@ interface Label {
   id: string;
   batch_no: string;
   product_id: string;
+  product_name: string;
   branch_id: string;
+  branch_name: string;
   serial_start: number;
   serial_end: number;
   printed_at: string;
   expiry_date: string;
   mrp: number;
   weight: string;
-  food_license: string | null;
-}
-
-interface Product {
-  id: string;
-  name: string;
+  food_license?: string;
 }
 
 const PrintLabelPage = () => {
@@ -40,21 +37,27 @@ const PrintLabelPage = () => {
     labelsPerPage: 10
   });
   
-  // Fetch label data with improved error handling
+  // Fetch label data
   const { data: label, isLoading: labelLoading, error: labelError } = useQuery({
     queryKey: ['label', id],
     queryFn: async () => {
       if (!id) throw new Error('Label ID is required');
 
-      // For demonstration, use mock data instead of actual Supabase call
-      // In a real app, we would use the actual Supabase call
+      // First try to get from session storage (for demo flow)
+      const storedLabel = sessionStorage.getItem(`label_${id}`);
+      if (storedLabel) {
+        return JSON.parse(storedLabel) as Label;
+      }
       
-      // Simulate a successful response
+      // For demonstration, use mock data if not in session storage
+      console.log("No label found in session storage, using mock data");
       return {
         id,
         batch_no: `BATCH20250501`,
         product_id: 'p1',
+        product_name: 'Organic Apples',
         branch_id: 'b1',
+        branch_name: 'Main Store',
         serial_start: 1,
         serial_end: 10,
         printed_at: new Date().toISOString(),
@@ -63,40 +66,43 @@ const PrintLabelPage = () => {
         weight: '500g',
         food_license: 'FSSAI-12345'
       } as Label;
-    },
-    enabled: !!id,
-    retry: 1,
-    refetchOnWindowFocus: false
-  });
 
-  // Fetch product data with improved error handling
-  const { data: product, isLoading: productLoading } = useQuery({
-    queryKey: ['product', label?.product_id],
-    queryFn: async () => {
-      if (!label?.product_id) throw new Error('Product ID is required');
+      // In a real implementation, we would fetch from Supabase:
+      // const { data, error } = await supabase
+      //   .from('labels')
+      //   .select('*, products(name)')
+      //   .eq('id', id)
+      //   .single();
       
-      // Use mock data for demo
-      return { 
-        id: label.product_id,
-        name: label.product_id === 'p1' ? 'Organic Apples' : 
-              label.product_id === 'p2' ? 'Fresh Bananas' : 'Premium Oranges'
-      } as Product;
+      // if (error) throw error;
+      // return {
+      //   ...data,
+      //   product_name: data.products?.name
+      // } as Label;
     },
-    enabled: !!label?.product_id,
     retry: 1,
     refetchOnWindowFocus: false
   });
 
   // Generate label array based on quantity
-  const labels = label ? Array.from({ length: label.serial_end - label.serial_start + 1 }, 
-    (_, i) => ({
-      ...label,
-      serial_no: label.serial_start + i
-    })
-  ) : [];
+  const labels = label ? Array.from({ 
+    length: label.serial_end - label.serial_start + 1 
+  }, (_, i) => ({
+    ...label,
+    serial_no: label.serial_start + i
+  })) : [];
 
   // Handle print with enhanced options
   const handlePrint = () => {
+    if (!label) {
+      toast({
+        title: "Error",
+        description: "No label data available to print",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsPrinting(true);
     
     const originalTitle = document.title;
@@ -205,6 +211,13 @@ const PrintLabelPage = () => {
     // Reset the printing state after a delay
     setTimeout(() => {
       setIsPrinting(false);
+      
+      // In a real app, we would update the database to mark labels as printed
+      // const { error } = await supabase
+      //   .from('labels')
+      //   .update({ status: 'printed' })
+      //   .eq('id', id);
+      
       toast({
         title: "Success",
         description: "Print job sent successfully!",
@@ -214,6 +227,15 @@ const PrintLabelPage = () => {
 
   // Save as PDF with improved implementation
   const handleSaveAsPdf = () => {
+    if (!label) {
+      toast({
+        title: "Error",
+        description: "No label data available to save",
+        variant: "destructive", 
+      });
+      return;
+    }
+    
     setIsSaving(true);
     
     toast({
@@ -393,7 +415,7 @@ const PrintLabelPage = () => {
             <Button 
               variant="secondary" 
               onClick={handleSaveAsPdf}
-              disabled={isSaving || labelLoading || productLoading}
+              disabled={isSaving || labelLoading}
               className="gap-2"
             >
               {isSaving ? (
@@ -405,7 +427,7 @@ const PrintLabelPage = () => {
             </Button>
             <Button 
               onClick={handlePrint}
-              disabled={isPrinting || labelLoading || productLoading}
+              disabled={isPrinting || labelLoading}
               className="gap-2"
             >
               {isPrinting ? (
@@ -418,7 +440,7 @@ const PrintLabelPage = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {(labelLoading || productLoading) ? (
+          {labelLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="flex flex-col items-center gap-2">
                 <RefreshCw className="h-8 w-8 animate-spin text-primary" />
@@ -485,7 +507,7 @@ const PrintLabelPage = () => {
                 {labels.length > 0 && (
                   <>
                     <div className="border rounded p-4 mb-4 bg-white">
-                      <h3 className="font-bold text-lg">{product?.name}</h3>
+                      <h3 className="font-bold text-lg">{label?.product_name}</h3>
                       <div className="flex justify-between text-sm">
                         <span>Weight: {label?.weight}</span>
                         <span>MRP: ₹{label?.mrp.toFixed(2)}</span>
@@ -536,7 +558,7 @@ const PrintLabelPage = () => {
                 <div className="label-container">
                   {labels.map((labelItem, index) => (
                     <div className="label" key={`${labelItem.id}-${index}`}>
-                      <h3>{product?.name}</h3>
+                      <h3>{label?.product_name}</h3>
                       <div className="label-row">
                         <span>Weight: {labelItem.weight}</span>
                         <span>MRP: ₹{labelItem.mrp.toFixed(2)}</span>
