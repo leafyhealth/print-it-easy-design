@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Printer, Save, RefreshCw, List } from "lucide-react";
+import { Printer, Save, RefreshCw, List, Download } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { toast } from "@/components/ui/use-toast";
@@ -33,6 +33,13 @@ const PrintLabelPage = () => {
   const navigate = useNavigate();
   const printContainerRef = useRef<HTMLDivElement>(null);
   const [activeLabelIndex, setActiveLabelIndex] = useState(0);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [printOptions, setPrintOptions] = useState({
+    showBorder: true,
+    pageSize: 'a4',
+    labelsPerPage: 10
+  });
   
   // Fetch label data
   const { data: label, isLoading: labelLoading, error: labelError } = useQuery({
@@ -87,8 +94,10 @@ const PrintLabelPage = () => {
     })
   ) : [];
 
-  // Handle print
+  // Handle print with enhanced options
   const handlePrint = () => {
+    setIsPrinting(true);
+    
     const originalTitle = document.title;
     document.title = `Labels - ${label?.batch_no || 'Printing'}`;
     
@@ -99,13 +108,14 @@ const PrintLabelPage = () => {
         description: "Could not open print window. Please check your browser settings.",
         variant: "destructive",
       });
+      setIsPrinting(false);
       return;
     }
     
     // Get the HTML content to print
     const contentToPrint = printContainerRef.current?.innerHTML;
     
-    // Write to the new window
+    // Write to the new window with enhanced styling options
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -113,42 +123,63 @@ const PrintLabelPage = () => {
         <title>${document.title}</title>
         <style>
           @media print {
-            body { margin: 0; }
+            body { margin: 0; padding: 10px; }
+            
             .label-container {
               display: flex;
               flex-wrap: wrap;
-              gap: 10px;
+              gap: ${printOptions.showBorder ? '10px' : '0'};
               width: 100%;
+              justify-content: space-between;
             }
+            
             .label {
-              border: 1px solid #000;
+              ${printOptions.showBorder ? 'border: 1px solid #000;' : ''}
               padding: 8px;
-              width: 2.5in;
-              height: 1.5in;
+              width: ${printOptions.pageSize === 'a4' ? '2.4in' : '2in'};
+              height: ${printOptions.pageSize === 'a4' ? '1.4in' : '1in'};
               page-break-inside: avoid;
               box-sizing: border-box;
               margin-bottom: 10px;
+              position: relative;
             }
+            
             .label h3 {
               margin: 0 0 4px 0;
               font-size: 14px;
+              font-weight: bold;
             }
+            
             .label-row {
               display: flex;
               justify-content: space-between;
               font-size: 12px;
               margin-bottom: 2px;
             }
+            
             .serial-no {
               font-weight: bold;
               font-size: 16px;
+              text-align: center;
             }
+            
             .batch-no {
               font-size: 10px;
             }
+            
             .food-license {
               font-size: 8px;
               font-style: italic;
+            }
+            
+            @page {
+              size: ${printOptions.pageSize};
+              margin: 0.5cm;
+            }
+            
+            /* Break pages after a certain number of labels */
+            .label:nth-child(${printOptions.labelsPerPage}n) {
+              page-break-after: always;
             }
           }
         </style>
@@ -169,20 +200,132 @@ const PrintLabelPage = () => {
     
     printWindow.document.close();
     document.title = originalTitle;
+    
+    // Reset the printing state after a delay
+    setTimeout(() => {
+      setIsPrinting(false);
+    }, 1500);
   };
 
-  // Save as PDF (mock function - in real app would use a PDF library)
+  // Save as PDF with improved implementation
   const handleSaveAsPdf = () => {
+    setIsSaving(true);
+    
     toast({
       title: "PDF Generation",
       description: "PDF download started. Please wait...",
     });
     
-    // In a real app, this would use a PDF generation library
+    // In a real-world scenario, you'd use a PDF library like jsPDF
+    // For this demo, we'll simulate the PDF generation process
+    
+    // Use the same print window approach but prompt for save instead
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        title: "Error",
+        description: "Could not open PDF generation window. Please check your browser settings.",
+        variant: "destructive",
+      });
+      setIsSaving(false);
+      return;
+    }
+    
+    const contentToPrint = printContainerRef.current?.innerHTML;
+    const fileName = `labels-${label?.batch_no || 'batch'}.pdf`;
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${fileName}</title>
+        <style>
+          body { margin: 0; padding: 10px; }
+          
+          .label-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            width: 100%;
+          }
+          
+          .label {
+            border: 1px solid #000;
+            padding: 8px;
+            width: 2.5in;
+            height: 1.5in;
+            page-break-inside: avoid;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+          }
+          
+          .label h3 {
+            margin: 0 0 4px 0;
+            font-size: 14px;
+          }
+          
+          .label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 2px;
+          }
+          
+          .serial-no {
+            font-weight: bold;
+            font-size: 16px;
+          }
+          
+          .batch-no {
+            font-size: 10px;
+          }
+          
+          .food-license {
+            font-size: 8px;
+            font-style: italic;
+          }
+          
+          @media print {
+            @page {
+              size: ${printOptions.pageSize};
+              margin: 0.5cm;
+            }
+            
+            /* Break pages after a certain number of labels */
+            .label:nth-child(${printOptions.labelsPerPage}n) {
+              page-break-after: always;
+            }
+          }
+          
+          .save-instructions {
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #f0f8ff;
+            border: 1px solid #007bff;
+            border-radius: 5px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="save-instructions">
+          <h2>Save as PDF Instructions</h2>
+          <p>1. Press Ctrl+P (or Cmd+P on Mac)</p>
+          <p>2. Change destination to "Save as PDF"</p>
+          <p>3. Click Save and choose where to save the file</p>
+        </div>
+        ${contentToPrint || ''}
+      </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    
     setTimeout(() => {
+      setIsSaving(false);
       toast({
         title: "PDF Ready",
-        description: "Your PDF has been generated and downloaded.",
+        description: "Follow the instructions to save your PDF.",
       });
     }, 1500);
   };
@@ -243,16 +386,26 @@ const PrintLabelPage = () => {
             <Button 
               variant="secondary" 
               onClick={handleSaveAsPdf}
+              disabled={isSaving || labelLoading || productLoading}
               className="gap-2"
             >
-              <Save className="h-4 w-4" />
+              {isSaving ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
               Save as PDF
             </Button>
             <Button 
               onClick={handlePrint}
+              disabled={isPrinting || labelLoading || productLoading}
               className="gap-2"
             >
-              <Printer className="h-4 w-4" />
+              {isPrinting ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Printer className="h-4 w-4" />
+              )}
               Print All
             </Button>
           </div>
@@ -267,6 +420,58 @@ const PrintLabelPage = () => {
             </div>
           ) : (
             <>
+              {/* Print options */}
+              <div className="mb-6 border rounded-lg p-4 bg-muted/20">
+                <h3 className="text-base font-medium mb-3">Print Options</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-center space-x-2">
+                    <input 
+                      type="checkbox" 
+                      id="showBorder"
+                      checked={printOptions.showBorder} 
+                      onChange={(e) => setPrintOptions(prev => ({...prev, showBorder: e.target.checked}))}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <label htmlFor="showBorder" className="text-sm font-medium">
+                      Show Border
+                    </label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <label htmlFor="pageSize" className="text-sm font-medium">
+                      Page Size:
+                    </label>
+                    <select 
+                      id="pageSize"
+                      value={printOptions.pageSize}
+                      onChange={(e) => setPrintOptions(prev => ({...prev, pageSize: e.target.value}))}
+                      className="rounded border border-gray-300 text-sm p-1"
+                    >
+                      <option value="a4">A4</option>
+                      <option value="letter">Letter</option>
+                      <option value="legal">Legal</option>
+                    </select>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <label htmlFor="labelsPerPage" className="text-sm font-medium">
+                      Labels per page:
+                    </label>
+                    <select 
+                      id="labelsPerPage"
+                      value={printOptions.labelsPerPage}
+                      onChange={(e) => setPrintOptions(prev => ({...prev, labelsPerPage: parseInt(e.target.value)}))}
+                      className="rounded border border-gray-300 text-sm p-1"
+                    >
+                      <option value="6">6</option>
+                      <option value="8">8</option>
+                      <option value="10">10</option>
+                      <option value="12">12</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               {/* Preview of single label for mobile/screen view */}
               <div className="mb-6 border rounded-lg p-4">
                 <h3 className="text-lg font-bold mb-2">Label Preview</h3>

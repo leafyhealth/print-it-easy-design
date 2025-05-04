@@ -1,288 +1,191 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle,
-  CardDescription 
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table";
-import { supabase } from "@/integrations/supabase/client";
-import { Printer, Search, Calendar, List } from "lucide-react";
-import { useQuery } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { toast } from "@/components/ui/use-toast";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Printer, ArrowRight } from "lucide-react";
+import { format } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Label {
   id: string;
   batch_no: string;
   product_id: string;
-  product_name?: string; // Will be populated after fetching
   branch_id: string;
-  branch_name?: string; // Will be populated after fetching
   serial_start: number;
   serial_end: number;
-  printed_at: string;
-  expiry_date: string;
   mrp: number;
   weight: string;
-}
-
-interface Product {
-  id: string;
-  name: string;
-}
-
-interface Branch {
-  id: string;
-  name: string;
+  printed_at: string;
+  expiry_date: string;
+  product_name?: string;
 }
 
 const LabelHistoryPage = () => {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
-  const [productFilter, setProductFilter] = useState('');
-  const [branchFilter, setBranchFilter] = useState('');
-
-  // Fetch labels with filters
-  const { data: labels, isLoading: labelsLoading, refetch } = useQuery({
-    queryKey: ['labels', dateFilter, productFilter, branchFilter],
-    queryFn: async () => {
-      let query = supabase
-        .from('labels')
-        .select('*')
-        .order('printed_at', { ascending: false });
-      
-      // Apply filters
-      if (dateFilter) {
-        query = query.eq('printed_at::date', dateFilter);
-      }
-      
-      if (productFilter) {
-        query = query.eq('product_id', productFilter);
-      }
-      
-      if (branchFilter) {
-        query = query.eq('branch_id', branchFilter);
-      }
-      
-      const { data, error } = await query;
-
-      if (error) {
-        console.error("Error fetching labels:", error);
-        throw error;
-      }
-      
-      return data || [];
-    }
+  const [filters, setFilters] = useState({
+    branch: '',
+    product: '',
+    date: '',
   });
 
-  // Fetch products for filter
-  const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ['products'],
+  // Fetch label history
+  const { data: labels, isLoading } = useQuery({
+    queryKey: ['labels', 'history', filters],
     queryFn: async () => {
-      // Dummy products for demo, replace with actual API call
-      return [
-        { id: 'p1', name: 'Organic Apples' },
-        { id: 'p2', name: 'Fresh Bananas' },
-        { id: 'p3', name: 'Premium Oranges' }
-      ] as Product[];
-      // In a real app, use:
-      // const { data, error } = await supabase.from('products').select('*');
+      // In a real app, use Supabase
+      // const { data, error } = await supabase
+      //   .from('labels')
+      //   .select('*, products(name)')
+      //   .order('printed_at', { ascending: false });
+      
       // if (error) throw error;
-      // return data || [];
-    }
-  });
+      // return data.map(item => ({
+      //   ...item,
+      //   product_name: item.products?.name
+      // }));
 
-  // Fetch branches for filter
-  const { data: branches, isLoading: branchesLoading } = useQuery({
-    queryKey: ['branches'],
-    queryFn: async () => {
-      // Dummy branches for demo, replace with actual API call
+      // Demo data for now
       return [
-        { id: 'b1', name: 'Main Store' },
-        { id: 'b2', name: 'Downtown Branch' },
-        { id: 'b3', name: 'Mall Outlet' }
-      ] as Branch[];
-      // In a real app, use:
-      // const { data, error } = await supabase.from('branches').select('*');
-      // if (error) throw error;
-      // return data || [];
+        {
+          id: '1',
+          batch_no: 'BATCH20250501',
+          product_id: 'p1',
+          branch_id: 'b1',
+          serial_start: 1,
+          serial_end: 50,
+          mrp: 99.99,
+          weight: '500g',
+          printed_at: new Date().toISOString(),
+          expiry_date: '2025-08-01',
+          product_name: 'Organic Apples'
+        },
+        {
+          id: '2',
+          batch_no: 'BATCH20250502',
+          product_id: 'p2',
+          branch_id: 'b2',
+          serial_start: 1,
+          serial_end: 100,
+          mrp: 49.99,
+          weight: '1kg',
+          printed_at: new Date(Date.now() - 86400000).toISOString(), // Yesterday
+          expiry_date: '2025-07-15',
+          product_name: 'Fresh Bananas'
+        },
+        {
+          id: '3',
+          batch_no: 'BATCH20250503',
+          product_id: 'p3',
+          branch_id: 'b1',
+          serial_start: 1,
+          serial_end: 30,
+          mrp: 79.99,
+          weight: '250g',
+          printed_at: new Date(Date.now() - 2 * 86400000).toISOString(), // 2 days ago
+          expiry_date: '2025-06-30',
+          product_name: 'Premium Oranges'
+        }
+      ];
     }
   });
 
-  // Enrich labels with product and branch names
-  const enrichedLabels = labels?.map(label => {
-    const product = products?.find(p => p.id === label.product_id);
-    const branch = branches?.find(b => b.id === label.branch_id);
-    
-    return {
-      ...label,
-      product_name: product?.name || 'Unknown Product',
-      branch_name: branch?.name || 'Unknown Branch'
-    };
-  }).filter(label => {
-    // Client-side search filter
-    if (!searchTerm) return true;
-    
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      label.batch_no.toLowerCase().includes(searchLower) ||
-      label.product_name.toLowerCase().includes(searchLower) ||
-      label.branch_name.toLowerCase().includes(searchLower) ||
-      label.weight.toLowerCase().includes(searchLower)
-    );
-  });
-
-  // Handle reprint
-  const handleReprint = (labelId: string) => {
+  const handlePrintLabel = (labelId: string) => {
     navigate(`/labels/print/${labelId}`);
-  };
-
-  // Clear filters
-  const clearFilters = () => {
-    setDateFilter('');
-    setProductFilter('');
-    setBranchFilter('');
-    setSearchTerm('');
   };
 
   return (
     <div className="container mx-auto py-8">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <div>
-            <CardTitle>Label Print History</CardTitle>
-            <CardDescription>View and reprint previously created label batches</CardDescription>
-          </div>
+          <CardTitle>Label History</CardTitle>
           <Button onClick={() => navigate('/labels')} className="gap-2">
-            <Printer className="h-4 w-4" /> Create New Labels
+            <Printer className="h-4 w-4" />
+            Print New Labels
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="mb-6 space-y-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search batch no, product or branch..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                <div>
-                  <Label htmlFor="dateFilter" className="sr-only">Date Filter</Label>
-                  <div className="relative">
-                    <Calendar className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="dateFilter"
-                      type="date"
-                      value={dateFilter}
-                      onChange={(e) => setDateFilter(e.target.value)}
-                      className="pl-8"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <Select value={productFilter} onValueChange={setProductFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Filter by Product" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All Products</SelectItem>
-                      {products?.map(product => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Select value={branchFilter} onValueChange={setBranchFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Filter by Branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All Branches</SelectItem>
-                      {branches?.map(branch => (
-                        <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <Button 
-                variant="outline" 
-                onClick={clearFilters}
-                className="whitespace-nowrap"
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div>
+              <Select 
+                value={filters.branch} 
+                onValueChange={(value) => setFilters(prev => ({ ...prev, branch: value }))}
               >
-                Clear Filters
-              </Button>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by Branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Branches</SelectItem>
+                  <SelectItem value="b1">Main Store</SelectItem>
+                  <SelectItem value="b2">Downtown Branch</SelectItem>
+                  <SelectItem value="b3">Mall Outlet</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Select 
+                value={filters.product} 
+                onValueChange={(value) => setFilters(prev => ({ ...prev, product: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by Product" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Products</SelectItem>
+                  <SelectItem value="p1">Organic Apples</SelectItem>
+                  <SelectItem value="p2">Fresh Bananas</SelectItem>
+                  <SelectItem value="p3">Premium Oranges</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Input 
+                type="date" 
+                value={filters.date}
+                onChange={(e) => setFilters(prev => ({ ...prev, date: e.target.value }))}
+                placeholder="Filter by Date"
+              />
             </div>
           </div>
-
-          <div className="overflow-x-auto rounded-md border">
+          
+          <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Batch No</TableHead>
                   <TableHead>Product</TableHead>
-                  <TableHead>Branch</TableHead>
+                  <TableHead>Quantity</TableHead>
                   <TableHead>Weight</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead>Printed Date</TableHead>
-                  <TableHead>Expiry Date</TableHead>
-                  <TableHead className="text-right">MRP</TableHead>
+                  <TableHead>MRP</TableHead>
+                  <TableHead>Printed On</TableHead>
+                  <TableHead>Expires On</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {labelsLoading ? (
+                {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
-                      Loading...
-                    </TableCell>
+                    <TableCell colSpan={8} className="text-center py-4">Loading...</TableCell>
                   </TableRow>
-                ) : enrichedLabels && enrichedLabels.length > 0 ? (
-                  enrichedLabels.map((label) => (
+                ) : labels && labels.length > 0 ? (
+                  labels.map((label) => (
                     <TableRow key={label.id}>
                       <TableCell className="font-medium">{label.batch_no}</TableCell>
                       <TableCell>{label.product_name}</TableCell>
-                      <TableCell>{label.branch_name}</TableCell>
+                      <TableCell>{label.serial_end - label.serial_start + 1}</TableCell>
                       <TableCell>{label.weight}</TableCell>
-                      <TableCell className="text-right">{label.serial_end - label.serial_start + 1}</TableCell>
-                      <TableCell>{format(new Date(label.printed_at), 'MMM dd, yyyy')}</TableCell>
-                      <TableCell>{format(new Date(label.expiry_date), 'MMM dd, yyyy')}</TableCell>
-                      <TableCell className="text-right">₹{label.mrp.toFixed(2)}</TableCell>
+                      <TableCell>₹{label.mrp.toFixed(2)}</TableCell>
+                      <TableCell>{format(new Date(label.printed_at), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell>{format(new Date(label.expiry_date), 'dd/MM/yyyy')}</TableCell>
                       <TableCell className="text-right">
                         <Button 
                           variant="outline" 
-                          size="sm"
-                          onClick={() => handleReprint(label.id)}
+                          size="sm" 
+                          onClick={() => handlePrintLabel(label.id)}
                           className="gap-1"
                         >
                           <Printer className="h-3.5 w-3.5" />
@@ -293,9 +196,7 @@ const LabelHistoryPage = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
-                      No label batches found.
-                    </TableCell>
+                    <TableCell colSpan={8} className="text-center py-4">No label history found</TableCell>
                   </TableRow>
                 )}
               </TableBody>
