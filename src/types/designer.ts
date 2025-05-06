@@ -1,3 +1,4 @@
+
 export interface Position {
   x: number;
   y: number;
@@ -70,6 +71,8 @@ export interface GridSettings {
   labelLayout?: string;
   columns?: number;
   rows?: number;
+  labelWidth?: number;
+  labelHeight?: number;
   horizontalGap?: number;
   verticalGap?: number;
   cornerRadius?: number;

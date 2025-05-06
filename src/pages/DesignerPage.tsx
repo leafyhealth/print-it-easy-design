@@ -28,6 +28,9 @@ const DesignerPage = () => {
   const [showRulers, setShowRulers] = useState(true);
   const [showSnaplines, setShowSnaplines] = useState(true);
   const [showMargins, setShowMargins] = useState(true);
+  
+  // Label grid preview state (for multi-label layouts)
+  const [showLabelGrid, setShowLabelGrid] = useState(false);
 
   // Check URL for template parameter
   useEffect(() => {
@@ -139,6 +142,8 @@ const DesignerPage = () => {
       let horizontalGapPx = templateSettings.horizontalGap || 0;
       let verticalGapPx = templateSettings.verticalGap || 0;
       let cornerRadiusPx = templateSettings.cornerRadius || 0;
+      let paperWidthPx = templateSettings.paperWidth;
+      let paperHeightPx = templateSettings.paperHeight;
       
       if (templateSettings.unit === 'in') {
         widthInPixels = templateSettings.labelWidth * 96;
@@ -146,12 +151,16 @@ const DesignerPage = () => {
         horizontalGapPx = (templateSettings.horizontalGap || 0) * 96;
         verticalGapPx = (templateSettings.verticalGap || 0) * 96;
         cornerRadiusPx = (templateSettings.cornerRadius || 0) * 96;
+        paperWidthPx = templateSettings.paperWidth * 96;
+        paperHeightPx = templateSettings.paperHeight * 96;
       } else if (templateSettings.unit === 'mm') {
         widthInPixels = templateSettings.labelWidth * 3.78;
         heightInPixels = templateSettings.labelHeight * 3.78;
         horizontalGapPx = (templateSettings.horizontalGap || 0) * 3.78;
         verticalGapPx = (templateSettings.verticalGap || 0) * 3.78;
         cornerRadiusPx = (templateSettings.cornerRadius || 0) * 3.78;
+        paperWidthPx = templateSettings.paperWidth * 3.78;
+        paperHeightPx = templateSettings.paperHeight * 3.78;
       }
 
       const { data, error } = await supabase
@@ -166,12 +175,14 @@ const DesignerPage = () => {
             showGrid: true,
             gridSize: 10,
             paperFormat: templateSettings.paperFormat,
-            paperWidth: templateSettings.paperWidth,
-            paperHeight: templateSettings.paperHeight,
+            paperWidth: Math.round(paperWidthPx),
+            paperHeight: Math.round(paperHeightPx),
             unit: templateSettings.unit,
             labelLayout: templateSettings.labelLayout,
             columns: templateSettings.columns,
             rows: templateSettings.rows,
+            labelWidth: Math.round(widthInPixels),
+            labelHeight: Math.round(heightInPixels),
             horizontalGap: Math.round(horizontalGapPx),
             verticalGap: Math.round(verticalGapPx),
             cornerRadius: Math.round(cornerRadiusPx)
@@ -191,9 +202,18 @@ const DesignerPage = () => {
       setSelectedTemplateId(data.id);
       setShowPaperTemplateSelector(false);
       
+      // Enable label grid preview if it's a multi-label layout
+      const gridSettings = typeof data.grid_settings === 'string' 
+        ? JSON.parse(data.grid_settings) 
+        : data.grid_settings;
+        
+      if (gridSettings?.labelLayout === 'grid' && gridSettings.columns > 1 && gridSettings.rows > 1) {
+        setShowLabelGrid(true);
+      }
+      
       // Dispatch event to notify other components about template selection
       document.dispatchEvent(new CustomEvent('template-selected', { 
-        detail: { templateId: data.id }
+        detail: { templateId: data.id, gridSettings }
       }));
       
       // Update URL with new template ID
@@ -249,6 +269,20 @@ const DesignerPage = () => {
   const handleTemplateSelection = (id: string) => {
     setSelectedTemplateId(id);
     
+    // Find the template to check if it's a multi-label layout
+    const selectedTemplate = templates?.find(t => t.id === id);
+    if (selectedTemplate) {
+      const gridSettings = typeof selectedTemplate.grid_settings === 'string' 
+        ? JSON.parse(selectedTemplate.grid_settings) 
+        : selectedTemplate.grid_settings;
+        
+      if (gridSettings?.labelLayout === 'grid' && gridSettings.columns > 1 && gridSettings.rows > 1) {
+        setShowLabelGrid(true);
+      } else {
+        setShowLabelGrid(false);
+      }
+    }
+    
     // Update URL with selected template ID
     const url = new URL(window.location.href);
     url.searchParams.set('template', id);
@@ -267,6 +301,16 @@ const DesignerPage = () => {
 
   const handleAlignVertical = (position: 'start' | 'center' | 'end') => {
     document.dispatchEvent(new CustomEvent('align-vertical', { detail: { position } }));
+  };
+
+  // Toggle label grid preview
+  const handleToggleLabelGrid = () => {
+    setShowLabelGrid(!showLabelGrid);
+    
+    // Notify canvas component about the change
+    document.dispatchEvent(new CustomEvent('toggle-label-grid', { 
+      detail: { showGrid: !showLabelGrid } 
+    }));
   };
 
   // Show error state if templates failed to load
@@ -304,6 +348,17 @@ const DesignerPage = () => {
     );
   }
 
+  // Get the selected template's grid settings
+  const selectedTemplate = templates?.find(t => t.id === selectedTemplateId);
+  const gridSettings = selectedTemplate?.grid_settings 
+    ? (typeof selectedTemplate.grid_settings === 'string' 
+      ? JSON.parse(selectedTemplate.grid_settings) 
+      : selectedTemplate.grid_settings) 
+    : null;
+  
+  const isMultiLabelTemplate = gridSettings?.labelLayout === 'grid' && 
+    gridSettings.columns > 1 && gridSettings.rows > 1;
+
   return (
     <div className="flex flex-col h-screen">
       <Header />
@@ -330,6 +385,24 @@ const DesignerPage = () => {
               onAlignHorizontal={handleAlignHorizontal}
               onAlignVertical={handleAlignVertical}
             />
+            
+            {isMultiLabelTemplate && (
+              <div className="mt-2 flex items-center">
+                <Button 
+                  size="sm" 
+                  variant={showLabelGrid ? "default" : "outline"}
+                  onClick={handleToggleLabelGrid}
+                  className="text-xs"
+                >
+                  {showLabelGrid ? "Hide Label Grid" : "Show Label Grid"}
+                </Button>
+                {showLabelGrid && (
+                  <span className="ml-2 text-xs text-gray-500">
+                    Design the primary label - changes will apply to all labels
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex-1">
             {selectedTemplateId ? (
@@ -341,6 +414,8 @@ const DesignerPage = () => {
                 showMargins={showMargins}
                 showRulers={showRulers}
                 showSnaplines={showSnaplines}
+                showLabelGrid={isMultiLabelTemplate && showLabelGrid}
+                gridSettings={gridSettings}
               />
             ) : (
               <div className="h-full flex items-center justify-center bg-gray-100">
