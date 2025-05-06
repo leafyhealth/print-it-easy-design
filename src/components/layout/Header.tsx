@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Printer, Save, Settings, User, Edit, Trash2, LogOut } from "lucide-react";
@@ -36,6 +36,7 @@ const Header = () => {
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [hasSelectedTemplate, setHasSelectedTemplate] = useState(false);
   
   // State for edit template dialog
   const [templateData, setTemplateData] = useState({
@@ -43,7 +44,7 @@ const Header = () => {
     description: '',
   });
 
-  // Check if user is authenticated
+  // Check if user is authenticated and if a template is selected
   React.useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -59,8 +60,25 @@ const Header = () => {
       }
     );
 
+    // Check if a template is selected
+    const templateId = getTemplateId();
+    setHasSelectedTemplate(!!templateId);
+
+    // Listen for template selection changes
+    const handleTemplateChange = () => {
+      const templateId = getTemplateId();
+      setHasSelectedTemplate(!!templateId);
+    };
+
+    window.addEventListener('popstate', handleTemplateChange);
+    
+    // Custom event for template selection
+    document.addEventListener('template-selected', handleTemplateChange);
+
     return () => {
       authListener.subscription.unsubscribe();
+      window.removeEventListener('popstate', handleTemplateChange);
+      document.removeEventListener('template-selected', handleTemplateChange);
     };
   }, []);
 
@@ -110,37 +128,38 @@ const Header = () => {
     }
     
     if (isDesignerPage) {
+      const templateId = getTemplateId();
+      
+      if (!templateId) {
+        toast({
+          title: "No template selected",
+          description: "Please select or create a template first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       setIsLoading(true);
       
       try {
         // Save template to the database
-        const templateId = getTemplateId();
-        if (templateId) {
-          // Update the template's updated_at field
-          const { error } = await supabase
-            .from('templates')
-            .update({ updated_at: new Date().toISOString() })
-            .eq('id', templateId);
-          
-          if (error) throw error;
-          
-          queryClient.invalidateQueries({ queryKey: ['template', templateId] });
-          queryClient.invalidateQueries({ queryKey: ['template-elements', templateId] });
-          
-          toast({
-            title: "Template saved",
-            description: "Your template has been saved successfully.",
-          });
-          
-          // Dispatch custom event for any listeners that need to know about the save
-          document.dispatchEvent(new CustomEvent('template-saved', { detail: { templateId } }));
-        } else {
-          toast({
-            title: "No template selected",
-            description: "Please select or create a template first.",
-            variant: "destructive"
-          });
-        }
+        const { error } = await supabase
+          .from('templates')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', templateId);
+        
+        if (error) throw error;
+        
+        queryClient.invalidateQueries({ queryKey: ['template', templateId] });
+        queryClient.invalidateQueries({ queryKey: ['template-elements', templateId] });
+        
+        toast({
+          title: "Template saved",
+          description: "Your template has been saved successfully.",
+        });
+        
+        // Dispatch custom event for any listeners that need to know about the save
+        document.dispatchEvent(new CustomEvent('template-saved', { detail: { templateId } }));
       } catch (error: any) {
         toast({
           title: "Save failed",
@@ -391,7 +410,7 @@ const Header = () => {
                 size="sm" 
                 className="gap-1" 
                 onClick={handleEditTemplate}
-                disabled={isLoading}
+                disabled={isLoading || !hasSelectedTemplate}
               >
                 <Edit className="h-4 w-4" />
                 <span className="hidden sm:inline">Edit</span>
@@ -401,7 +420,7 @@ const Header = () => {
                 size="sm" 
                 className="gap-1 text-red-500" 
                 onClick={handleDeleteTemplate}
-                disabled={isLoading}
+                disabled={isLoading || !hasSelectedTemplate}
               >
                 <Trash2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Delete</span>
@@ -413,7 +432,7 @@ const Header = () => {
             size="sm" 
             className="gap-1" 
             onClick={handleSave}
-            disabled={isLoading}
+            disabled={isLoading || (isDesignerPage && !hasSelectedTemplate)}
           >
             <Save className="h-4 w-4" />
             <span className="hidden sm:inline">Save</span>
@@ -423,7 +442,7 @@ const Header = () => {
             size="sm" 
             className="gap-1" 
             onClick={handlePrint}
-            disabled={isLoading}
+            disabled={isLoading || (isDesignerPage && !hasSelectedTemplate)}
           >
             <Printer className="h-4 w-4" />
             <span className="hidden sm:inline">Print</span>

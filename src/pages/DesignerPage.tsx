@@ -35,6 +35,11 @@ const DesignerPage = () => {
     const templateId = urlParams.get('template');
     if (templateId) {
       setSelectedTemplateId(templateId);
+      
+      // Dispatch event to notify other components about template selection
+      document.dispatchEvent(new CustomEvent('template-selected', { 
+        detail: { templateId }
+      }));
     }
   }, []);
 
@@ -186,6 +191,16 @@ const DesignerPage = () => {
       setSelectedTemplateId(data.id);
       setShowPaperTemplateSelector(false);
       
+      // Dispatch event to notify other components about template selection
+      document.dispatchEvent(new CustomEvent('template-selected', { 
+        detail: { templateId: data.id }
+      }));
+      
+      // Update URL with new template ID
+      const url = new URL(window.location.href);
+      url.searchParams.set('template', data.id);
+      window.history.pushState({}, '', url.toString());
+      
       toast({
         title: 'Template Created',
         description: `${data.name} has been created successfully`
@@ -229,6 +244,21 @@ const DesignerPage = () => {
       document.removeEventListener('add-element', handleAddElement);
     };
   }, []);
+
+  // Handle template selection from sidebar
+  const handleTemplateSelection = (id: string) => {
+    setSelectedTemplateId(id);
+    
+    // Update URL with selected template ID
+    const url = new URL(window.location.href);
+    url.searchParams.set('template', id);
+    window.history.pushState({}, '', url.toString());
+    
+    // Dispatch event to notify other components about template selection
+    document.dispatchEvent(new CustomEvent('template-selected', { 
+      detail: { templateId: id }
+    }));
+  };
 
   // Alignment handlers for the VisualAidTools component
   const handleAlignHorizontal = (position: 'start' | 'center' | 'end') => {
@@ -282,7 +312,7 @@ const DesignerPage = () => {
           <Sidebar 
             templates={templates || []} 
             onCreateTemplate={() => setShowPaperTemplateSelector(true)}
-            onSelectTemplate={(id) => setSelectedTemplateId(id)}
+            onSelectTemplate={handleTemplateSelection}
             selectedTemplateId={selectedTemplateId}
           />
         </div>
