@@ -11,7 +11,7 @@ export interface Size {
 
 export interface ElementBase {
   id: string;
-  type: 'text' | 'barcode' | 'image' | 'shape';
+  type: 'text' | 'barcode' | 'image' | 'shape' | 'nutrition-facts';
   position: Position;
   size: Size;
   rotation: number;
@@ -55,11 +55,43 @@ export interface ShapeElement extends ElementBase {
   borderColor: string;
 }
 
+export interface NutritionFactsElement extends ElementBase {
+  type: 'nutrition-facts';
+  data: {
+    servingSize: string;
+    servingsPerContainer: string;
+    calories: number;
+    totalFat: number;
+    saturatedFat: number;
+    transFat: number;
+    cholesterol: number;
+    sodium: number;
+    totalCarbohydrate: number;
+    dietaryFiber: number;
+    sugars: number;
+    addedSugars?: number;
+    protein: number;
+    vitaminD?: number;
+    calcium?: number;
+    iron?: number;
+    potassium?: number;
+  };
+  style: {
+    fontFamily: string;
+    fontSize: number;
+    headerFontSize: number;
+    color: string;
+    backgroundColor: string;
+    borderColor: string;
+  };
+}
+
 export type DesignElement = 
   | TextElement 
   | BarcodeElement 
   | ImageElement 
-  | ShapeElement;
+  | ShapeElement
+  | NutritionFactsElement;
 
 export interface GridSettings {
   showGrid?: boolean;

@@ -23,6 +23,8 @@ interface CanvasProps {
   showMargins?: boolean;
   showRulers?: boolean;
   showSnaplines?: boolean;
+  showLabelGrid?: boolean;
+  gridSettings?: GridSettings | null;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -33,6 +35,8 @@ const Canvas: React.FC<CanvasProps> = ({
   showMargins: initialShowMargins = false,
   showRulers: initialShowRulers = true,
   showSnaplines: initialShowSnaplines = false,
+  showLabelGrid = false,
+  gridSettings = null,
 }) => {
   const queryClient = useQueryClient();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -61,6 +65,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStartPos, setPanStartPos] = useState({ x: 0, y: 0 });
+  const [showLabelGridState, setShowLabelGridState] = useState(showLabelGrid);
 
   // Query template data
   const { data: template, isLoading: isTemplateLoading, error: templateError } = useQuery({
@@ -781,6 +786,49 @@ const Canvas: React.FC<CanvasProps> = ({
     };
   }, [templateId]); // Only depend on templateId since our handler functions are stable now
 
+  // Listen for label grid toggle events
+  useEffect(() => {
+    const handleToggleLabelGrid = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      setShowLabelGridState(customEvent.detail.showGrid);
+    };
+
+    document.addEventListener('toggle-label-grid', handleToggleLabelGrid);
+    
+    return () => {
+      document.removeEventListener('toggle-label-grid', handleToggleLabelGrid);
+    };
+  }, []);
+
+  // Update label grid state when prop changes
+  useEffect(() => {
+    setShowLabelGridState(showLabelGrid);
+  }, [showLabelGrid]);
+
+  // Show appropriate dimensions based on the label settings
+  const getLabelDimensions = () => {
+    if (!gridSettings || gridSettings.labelLayout !== 'grid') {
+      return { width: width, height: height };
+    }
+
+    return {
+      width: gridSettings.labelWidth || width,
+      height: gridSettings.labelHeight || height
+    };
+  };
+
+  const labelDimensions = getLabelDimensions();
+
+  // Auto-fit and center the canvas when template changes
+  useEffect(() => {
+    if (templateId && !isLoading && !hasError) {
+      // Delay the zoom fit slightly to ensure dimensions are ready
+      setTimeout(() => {
+        handleZoomFit();
+      }, 300);
+    }
+  }, [templateId, isLoading, hasError]);
+
   // Render loading state
   if (isLoading) {
     return (
@@ -874,6 +922,13 @@ const Canvas: React.FC<CanvasProps> = ({
         ref={canvasRef}
         onClick={handleCanvasClick}
       >
+        {/* Label dimensions indicator */}
+        <div className="absolute top-2 left-2 bg-white/90 px-2 py-1 rounded text-xs font-mono text-gray-700 shadow z-10">
+          {gridSettings?.labelLayout === 'grid' ? 
+            `Label: ${Math.round(labelDimensions.width)}px × ${Math.round(labelDimensions.height)}px` : 
+            `Canvas: ${width}px × ${height}px`}
+        </div>
+        
         <div
           className="absolute bg-white shadow-lg"
           style={{
@@ -891,6 +946,8 @@ const Canvas: React.FC<CanvasProps> = ({
             gridSize={gridSettings?.gridSize || 10}
             showMargins={showMargins}
             marginSize={15}
+            showLabelGrid={showLabelGridState}
+            gridSettings={gridSettings}
           />
           
           <CanvasRulers

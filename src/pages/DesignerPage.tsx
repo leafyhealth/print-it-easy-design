@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Header from '../components/layout/Header';
 import Sidebar from '../components/layout/Sidebar';
@@ -313,6 +312,23 @@ const DesignerPage = () => {
     }));
   };
 
+  // Ensure the page is scrollable
+  useEffect(() => {
+    // Add overflow handling for the main container
+    const mainContent = document.getElementById('designer-main-content');
+    if (mainContent) {
+      mainContent.style.overflow = 'auto';
+      mainContent.style.height = 'calc(100vh - 64px)'; // Header height
+    }
+    
+    return () => {
+      if (mainContent) {
+        mainContent.style.overflow = '';
+        mainContent.style.height = '';
+      }
+    };
+  }, []);
+
   // Show error state if templates failed to load
   if (templatesError) {
     return (
@@ -362,8 +378,8 @@ const DesignerPage = () => {
   return (
     <div className="flex flex-col h-screen">
       <Header />
-      <div className="flex flex-1 overflow-hidden">
-        <div className="w-72">
+      <div id="designer-main-content" className="flex flex-1 overflow-auto">
+        <div className="w-72 flex-shrink-0">
           <Sidebar 
             templates={templates || []} 
             onCreateTemplate={() => setShowPaperTemplateSelector(true)}
@@ -371,7 +387,7 @@ const DesignerPage = () => {
             selectedTemplateId={selectedTemplateId}
           />
         </div>
-        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-auto flex flex-col">
           <div className="p-2 border-b bg-gray-50">
             <VisualAidTools 
               showGrid={showGrid}
@@ -404,7 +420,7 @@ const DesignerPage = () => {
               </div>
             )}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 overflow-auto">
             {selectedTemplateId ? (
               <Canvas 
                 width={templates?.find(t => t.id === selectedTemplateId)?.width || 600}
@@ -438,6 +454,7 @@ const DesignerPage = () => {
         onConfirm={(templateSettings) => createTemplateMutation.mutate(templateSettings)}
       />
 
+      {/* Loading overlay */}
       {isLoadingTemplates && selectedTemplateId && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-md shadow-lg flex items-center space-x-3">
@@ -447,6 +464,7 @@ const DesignerPage = () => {
         </div>
       )}
 
+      {/* Authentication check */}
       {!user && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
