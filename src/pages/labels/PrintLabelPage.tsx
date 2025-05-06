@@ -7,14 +7,15 @@ import { Printer, Save, RefreshCw, List } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { toast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Label {
   id: string;
   batch_no: string;
   product_id: string;
-  product_name: string;
+  product_name?: string;
   branch_id: string;
-  branch_name: string;
+  branch_name?: string;
   serial_start: number;
   serial_end: number;
   printed_at: string;
@@ -37,52 +38,98 @@ const PrintLabelPage = () => {
     labelsPerPage: 10
   });
   
-  // Fetch label data
+  // Fetch label data from Supabase
   const { data: label, isLoading: labelLoading, error: labelError } = useQuery({
     queryKey: ['label', id],
     queryFn: async () => {
       if (!id) throw new Error('Label ID is required');
-
-      // First try to get from session storage (for demo flow)
-      const storedLabel = sessionStorage.getItem(`label_${id}`);
-      if (storedLabel) {
-        return JSON.parse(storedLabel) as Label;
+      
+      // Fetch label from the database
+      const { data: labelData, error: labelError } = await supabase
+        .from('labels')
+        .select('*')
+        .eq('id', id)
+        .single();
+        
+      if (labelError) {
+        console.error('Error fetching label:', labelError);
+        throw new Error('Failed to fetch label data');
       }
       
-      // For demonstration, use mock data if not in session storage
-      console.log("No label found in session storage, using mock data");
-      return {
-        id,
-        batch_no: `BATCH20250501`,
-        product_id: 'p1',
-        product_name: 'Organic Apples',
-        branch_id: 'b1',
-        branch_name: 'Main Store',
-        serial_start: 1,
-        serial_end: 10,
-        printed_at: new Date().toISOString(),
-        expiry_date: '2025-08-01',
-        mrp: 99.99,
-        weight: '500g',
-        food_license: 'FSSAI-12345'
-      } as Label;
-
-      // In a real implementation, we would fetch from Supabase:
-      // const { data, error } = await supabase
-      //   .from('labels')
-      //   .select('*, products(name)')
-      //   .eq('id', id)
-      //   .single();
+      if (!labelData) {
+        throw new Error('Label not found');
+      }
       
-      // if (error) throw error;
-      // return {
-      //   ...data,
-      //   product_name: data.products?.name
-      // } as Label;
+      // Fetch product name
+      let productName = 'Unknown Product';
+      if (labelData.product_id) {
+        // In a real implementation, we would fetch from a products table
+        // Example code (uncomment when you have a products table):
+        /*
+        const { data: productData } = await supabase
+          .from('products')
+          .select('name')
+          .eq('id', labelData.product_id)
+          .single();
+        
+        if (productData) {
+          productName = productData.name;
+        }
+        */
+      }
+      
+      // Fetch branch name
+      let branchName = 'Unknown Branch';
+      if (labelData.branch_id) {
+        // In a real implementation, we would fetch from a branches table
+        // Example code (uncomment when you have a branches table):
+        /*
+        const { data: branchData } = await supabase
+          .from('branches')
+          .select('name')
+          .eq('id', labelData.branch_id)
+          .single();
+        
+        if (branchData) {
+          branchName = branchData.name;
+        }
+        */
+      }
+
+      return {
+        ...labelData,
+        product_name: productName,
+        branch_name: branchName
+      } as Label;
     },
     retry: 1,
     refetchOnWindowFocus: false
   });
+
+  // Update printed status in database when printing
+  const updatePrintStatus = async () => {
+    if (!id) return;
+    
+    try {
+      const { error } = await supabase
+        .from('labels')
+        .update({ 
+          printed_at: new Date().toISOString() 
+        })
+        .eq('id', id);
+        
+      if (error) {
+        console.error('Error updating print status:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update print status in database",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error updating print status:', error);
+    }
+  };
 
   // Generate label array based on quantity
   const labels = label ? Array.from({ 
@@ -93,7 +140,7 @@ const PrintLabelPage = () => {
   })) : [];
 
   // Handle print with enhanced options
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!label) {
       toast({
         title: "Error",
@@ -209,14 +256,11 @@ const PrintLabelPage = () => {
     document.title = originalTitle;
     
     // Reset the printing state after a delay
-    setTimeout(() => {
+    setTimeout(async () => {
       setIsPrinting(false);
       
-      // In a real app, we would update the database to mark labels as printed
-      // const { error } = await supabase
-      //   .from('labels')
-      //   .update({ status: 'printed' })
-      //   .eq('id', id);
+      // Update print status in database
+      await updatePrintStatus();
       
       toast({
         title: "Success",
@@ -226,7 +270,7 @@ const PrintLabelPage = () => {
   };
 
   // Save as PDF with improved implementation
-  const handleSaveAsPdf = () => {
+  const handleSaveAsPdf = async () => {
     if (!label) {
       toast({
         title: "Error",
@@ -344,6 +388,9 @@ const PrintLabelPage = () => {
     `);
     
     printWindow.document.close();
+    
+    // Update print status in database
+    await updatePrintStatus();
     
     setTimeout(() => {
       setIsSaving(false);
