@@ -1,10 +1,22 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Printer, Save, Settings, User, Edit, Trash2 } from "lucide-react";
+import { Printer, Save, Settings, User, Edit, Trash2, LogOut } from "lucide-react";
 import { toast } from '@/components/ui/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -18,27 +30,125 @@ const Header = () => {
     return urlParams.get('template');
   };
 
+  // State for the user authentication
+  const [user, setUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  
+  // State for edit template dialog
+  const [templateData, setTemplateData] = useState({
+    name: '',
+    description: '',
+  });
+
+  // Check if user is authenticated
+  React.useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    
+    getUser();
+
+    // Listen for auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setUser(session?.user || null);
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Load template data when edit dialog is opened
+  React.useEffect(() => {
+    if (isEditDialogOpen) {
+      const fetchTemplateData = async () => {
+        const templateId = getTemplateId();
+        if (templateId) {
+          const { data, error } = await supabase
+            .from('templates')
+            .select('name, description')
+            .eq('id', templateId)
+            .single();
+          
+          if (error) {
+            toast({
+              title: "Failed to load template data",
+              description: error.message,
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          if (data) {
+            setTemplateData({
+              name: data.name || '',
+              description: data.description || '',
+            });
+          }
+        }
+      };
+      
+      fetchTemplateData();
+    }
+  }, [isEditDialogOpen]);
+
   const handleSave = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to save templates",
+        variant: "destructive"
+      });
+      navigate('/auth');
+      return;
+    }
+    
     if (isDesignerPage) {
-      // Refresh template data
-      const templateId = getTemplateId();
-      if (templateId) {
-        queryClient.invalidateQueries({ queryKey: ['template', templateId] });
-        queryClient.invalidateQueries({ queryKey: ['template-elements', templateId] });
-        
+      setIsLoading(true);
+      
+      try {
+        // Save template to the database
+        const templateId = getTemplateId();
+        if (templateId) {
+          // Update the template's updated_at field
+          const { error } = await supabase
+            .from('templates')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', templateId);
+          
+          if (error) throw error;
+          
+          queryClient.invalidateQueries({ queryKey: ['template', templateId] });
+          queryClient.invalidateQueries({ queryKey: ['template-elements', templateId] });
+          
+          toast({
+            title: "Template saved",
+            description: "Your template has been saved successfully.",
+          });
+          
+          // Dispatch custom event for any listeners that need to know about the save
+          document.dispatchEvent(new CustomEvent('template-saved', { detail: { templateId } }));
+        } else {
+          toast({
+            title: "No template selected",
+            description: "Please select or create a template first.",
+            variant: "destructive"
+          });
+        }
+      } catch (error: any) {
         toast({
-          title: "Template saved",
-          description: "Your template has been saved successfully.",
-        });
-        
-        // Dispatch custom event for any listeners that need to know about the save
-        document.dispatchEvent(new CustomEvent('template-saved', { detail: { templateId } }));
-      } else {
-        toast({
-          title: "No template selected",
-          description: "Please select or create a template first.",
+          title: "Save failed",
+          description: error.message || "An unexpected error occurred",
           variant: "destructive"
         });
+      } finally {
+        setIsLoading(false);
       }
     } else {
       toast({
@@ -48,7 +158,7 @@ const Header = () => {
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (isDesignerPage) {
       const templateId = getTemplateId();
       if (templateId) {
@@ -69,18 +179,120 @@ const Header = () => {
     }
   };
 
-  const handleDeleteTemplate = () => {
+  const handleEditTemplate = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to edit templates",
+        variant: "destructive"
+      });
+      navigate('/auth');
+      return;
+    }
+    
     if (isDesignerPage) {
       const templateId = getTemplateId();
       if (templateId) {
-        // Show confirmation dialog here - in a real app you would use a modal
-        if (window.confirm("Are you sure you want to delete this template?")) {
-          // Delete template logic would go here
-          toast({
-            title: "Template deleted",
-            description: "The template has been deleted successfully.",
-          });
-          navigate('/designer'); // Redirect to designer page without template
+        setIsEditDialogOpen(true);
+      } else {
+        toast({
+          title: "No template selected",
+          description: "Please select a template first to edit its properties.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleSaveTemplateChanges = async () => {
+    const templateId = getTemplateId();
+    if (!templateId) return;
+    
+    setIsLoading(true);
+    
+    try {
+      const { error } = await supabase
+        .from('templates')
+        .update({
+          name: templateData.name,
+          description: templateData.description,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', templateId);
+      
+      if (error) throw error;
+      
+      queryClient.invalidateQueries({ queryKey: ['templates'] });
+      
+      toast({
+        title: "Template updated",
+        description: "Template properties have been updated successfully.",
+      });
+      
+      setIsEditDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Update failed",
+        description: error.message || "Failed to update template properties",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteTemplate = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to delete templates",
+        variant: "destructive"
+      });
+      navigate('/auth');
+      return;
+    }
+    
+    if (isDesignerPage) {
+      const templateId = getTemplateId();
+      if (templateId) {
+        // Show confirmation dialog
+        if (window.confirm("Are you sure you want to delete this template? This action cannot be undone.")) {
+          setIsLoading(true);
+          
+          try {
+            // First delete template elements
+            const { error: elementsError } = await supabase
+              .from('template_elements')
+              .delete()
+              .eq('template_id', templateId);
+            
+            if (elementsError) throw elementsError;
+            
+            // Then delete the template
+            const { error: templateError } = await supabase
+              .from('templates')
+              .delete()
+              .eq('id', templateId);
+            
+            if (templateError) throw templateError;
+            
+            queryClient.invalidateQueries({ queryKey: ['templates'] });
+            
+            toast({
+              title: "Template deleted",
+              description: "The template has been deleted successfully.",
+            });
+            
+            navigate('/designer'); // Redirect to designer page without template
+          } catch (error: any) {
+            toast({
+              title: "Delete failed",
+              description: error.message || "Failed to delete template",
+              variant: "destructive"
+            });
+          } finally {
+            setIsLoading(false);
+          }
         }
       } else {
         toast({
@@ -92,22 +304,56 @@ const Header = () => {
     }
   };
 
-  const handleEditTemplate = () => {
-    if (isDesignerPage) {
-      const templateId = getTemplateId();
-      if (templateId) {
-        toast({
-          title: "Edit template",
-          description: "You can edit the template properties.",
-        });
-        // In a real app, this would open a modal for editing template properties
-      } else {
-        toast({
-          title: "No template selected",
-          description: "Please select a template first to edit its properties.",
-          variant: "destructive"
-        });
-      }
+  const handleSettingsClick = () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to access settings",
+        variant: "destructive"
+      });
+      navigate('/auth');
+      return;
+    }
+    
+    setIsSettingsDialogOpen(true);
+  };
+
+  const handleUserProfileClick = () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to view your profile",
+        variant: "destructive"
+      });
+      navigate('/auth');
+      return;
+    }
+    
+    setIsProfileDialogOpen(true);
+  };
+
+  const handleLogout = async () => {
+    setIsLoading(true);
+    
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+      });
+      
+      navigate('/auth');
+    } catch (error: any) {
+      toast({
+        title: "Logout failed",
+        description: error.message || "Failed to log out",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -140,32 +386,224 @@ const Header = () => {
         <div className="flex items-center gap-2">
           {isDesignerPage && (
             <>
-              <Button variant="outline" size="sm" className="gap-1" onClick={handleEditTemplate}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-1" 
+                onClick={handleEditTemplate}
+                disabled={isLoading}
+              >
                 <Edit className="h-4 w-4" />
                 <span className="hidden sm:inline">Edit</span>
               </Button>
-              <Button variant="outline" size="sm" className="gap-1 text-red-500" onClick={handleDeleteTemplate}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-1 text-red-500" 
+                onClick={handleDeleteTemplate}
+                disabled={isLoading}
+              >
                 <Trash2 className="h-4 w-4" />
                 <span className="hidden sm:inline">Delete</span>
               </Button>
             </>
           )}
-          <Button variant="outline" size="sm" className="gap-1" onClick={handleSave}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-1" 
+            onClick={handleSave}
+            disabled={isLoading}
+          >
             <Save className="h-4 w-4" />
             <span className="hidden sm:inline">Save</span>
           </Button>
-          <Button variant="outline" size="sm" className="gap-1" onClick={handlePrint}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-1" 
+            onClick={handlePrint}
+            disabled={isLoading}
+          >
             <Printer className="h-4 w-4" />
             <span className="hidden sm:inline">Print</span>
           </Button>
-          <Button variant="ghost" size="icon">
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={handleSettingsClick}
+            disabled={isLoading}
+          >
             <Settings className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon">
-            <User className="h-5 w-5" />
-          </Button>
+          <div className="relative">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={handleUserProfileClick}
+              disabled={isLoading}
+            >
+              {user ? (
+                <div className="h-6 w-6 rounded-full bg-designer-primary text-white flex items-center justify-center">
+                  {user.email ? user.email[0].toUpperCase() : <User className="h-5 w-5" />}
+                </div>
+              ) : (
+                <User className="h-5 w-5" />
+              )}
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Edit Template Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Template</DialogTitle>
+            <DialogDescription>
+              Update the details of your template.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="name"
+                value={templateData.name}
+                onChange={(e) => setTemplateData({ ...templateData, name: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="description" className="text-right">
+                Description
+              </Label>
+              <Textarea
+                id="description"
+                value={templateData.description}
+                onChange={(e) => setTemplateData({ ...templateData, description: e.target.value })}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveTemplateChanges} disabled={isLoading}>
+              {isLoading ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Settings Dialog */}
+      <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Application Settings</DialogTitle>
+            <DialogDescription>
+              Configure your application preferences
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="dark-mode" className="">
+                Dark Mode
+              </Label>
+              <input
+                id="dark-mode"
+                type="checkbox"
+                className="toggle"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="notifications" className="">
+                Enable Notifications
+              </Label>
+              <input
+                id="notifications"
+                type="checkbox"
+                className="toggle"
+                defaultChecked
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="auto-save" className="">
+                Auto-Save (minutes)
+              </Label>
+              <Input
+                id="auto-save"
+                type="number"
+                defaultValue="5"
+                min="0"
+                className="w-24"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSettingsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              toast({
+                title: "Settings Saved",
+                description: "Your settings have been saved successfully.",
+              });
+              setIsSettingsDialogOpen(false);
+            }}>
+              Save Settings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* User Profile Dialog */}
+      <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>User Profile</DialogTitle>
+            <DialogDescription>
+              Your account information
+            </DialogDescription>
+          </DialogHeader>
+          {user && (
+            <div className="py-4">
+              <div className="flex flex-col items-center justify-center mb-4">
+                <div className="h-16 w-16 rounded-full bg-designer-primary text-white flex items-center justify-center text-xl mb-2">
+                  {user.email ? user.email[0].toUpperCase() : "U"}
+                </div>
+                <p className="text-sm font-medium">{user.email}</p>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <Label>Email</Label>
+                  <p className="text-sm mt-1">{user.email}</p>
+                </div>
+                <div>
+                  <Label>Account Created</Label>
+                  <p className="text-sm mt-1">
+                    {user.created_at ? new Date(user.created_at).toLocaleDateString() : "N/A"}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6">
+                <Button 
+                  variant="destructive" 
+                  className="w-full gap-2" 
+                  onClick={handleLogout}
+                  disabled={isLoading}
+                >
+                  <LogOut className="h-4 w-4" />
+                  {isLoading ? "Logging out..." : "Logout"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </header>
   );
 };
